@@ -781,16 +781,16 @@ SafeCall("TeleportSystem", function()
 
     local TARGET_UID = nil
     local SAFE_ZONE = Vector3.new(533, 70, -366)
-    local FLY_SPEED = 300
-    local RETURN_SPEED = 300
+    local FLY_SPEED = 350
+    local RETURN_SPEED = 350
     local CurrentMethod = "TeleportFly"
-    local FLY_OFFSET = 25
+    local FLY_OFFSET = 13
     local SHOT_DISTANCE = 30
     local LOCK_ABOVE = 2
     local ARRIVE_DISTANCE = 2
     local SAFE_LOCK_DISTANCE = 3
     local TIMEOUT_SECONDS = 30
-    local COLLECT_INTERVAL = 0.2
+    local COLLECT_INTERVAL = 0.3
     local SEARCH_PREFIX = "FirstAreaEgg"
     local POSITION_THRESHOLD = 1
     local LOCK_POSITION = Vector3.new(607.6259155273438, 70.57420349121094, -326.8830261230469)
