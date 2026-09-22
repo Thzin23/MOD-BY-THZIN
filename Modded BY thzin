@@ -1,0 +1,1840 @@
+--==================================================
+-- BY THZIN | STEAL AN EGG | COMPLETO v5
+-- Material Design | #151E19 | Com Resize
+--==================================================
+_G.YOKUDO = {
+    Name = "BY THZIN", AssetID = "rbxassetid://101352576986760",
+    UI = {
+        Width = 520, Height = 380, SidebarWidth = 130,
+        Theme = {
+            Background = Color3.fromRGB(21,30,25),
+            Surface = Color3.fromRGB(28,38,33),
+            SurfaceHi = Color3.fromRGB(36,48,42),
+            SurfaceHi2 = Color3.fromRGB(46,60,52),
+            Primary = Color3.fromRGB(74,222,128),
+            PrimaryDark = Color3.fromRGB(34,197,94),
+            Text = Color3.fromRGB(232,240,235),
+            SubText = Color3.fromRGB(139,154,145),
+            Divider = Color3.fromRGB(60,76,68),
+            Danger = Color3.fromRGB(239,68,68),
+            Warning = Color3.fromRGB(251,191,36),
+        }
+    },
+}
+local T = _G.YOKUDO.UI.Theme
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local ContentProvider = game:GetService("ContentProvider")
+local Player = Players.LocalPlayer
+
+local function Log(m) print("[BY THZIN] " .. m) end
+local function SafeCall(name, fn)
+    local ok, err = pcall(fn)
+    if not ok then warn("[BY THZIN] ❌ " .. name .. ": " .. tostring(err)) else Log("✅ " .. name) end
+    return ok
+end
+local function AddRipple(btn, color)
+    color = color or T.Primary
+    local r = Instance.new("Frame")
+    r.Name = "Ripple" r.BackgroundColor3 = color r.BackgroundTransparency = 0.6
+    r.BorderSizePixel = 0 r.Size = UDim2.new(0,0,0,0) r.AnchorPoint = Vector2.new(0.5,0.5)
+    r.ZIndex = btn.ZIndex + 1 r.Parent = btn
+    Instance.new("UICorner", r).CornerRadius = UDim.new(1,0)
+    btn.MouseButton1Down:Connect(function()
+        local mx, my = UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y
+        local ax, ay = btn.AbsolutePosition.X, btn.AbsolutePosition.Y
+        local sz = btn.AbsoluteSize
+        r.Position = UDim2.new(0, mx-ax, 0, my-ay)
+        r.Size = UDim2.new(0,0,0,0) r.BackgroundTransparency = 0.6
+        local maxD = math.max(sz.X, sz.Y) * 2.5
+        TweenService:Create(r, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0,maxD,0,maxD), BackgroundTransparency = 1
+        }):Play()
+        task.delay(0.5, function()
+            if r and r.Parent then r.Size = UDim2.new(0,0,0,0) r.BackgroundTransparency = 0.6 end
+        end)
+    end)
+end
+
+--==================================================
+-- ResetCharacterState
+--==================================================
+local function ResetCharacterState()
+    local C = Player.Character
+    if not C then return end
+    local H = C:FindFirstChildOfClass("Humanoid")
+    if not H then return end
+    pcall(function()
+        H.PlatformStand = false
+        H.Sit = false
+        H.WalkSpeed = 16
+        H.JumpPower = 50
+        H.UseJumpPower = true
+        H.AutoRotate = true
+    end)
+    pcall(function()
+        H:SetStateEnabled(Enum.HumanoidStateType.Physics, true)
+        H:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
+        H:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+        H:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+        H:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+        H:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+        H:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+    end)
+    local R = C:FindFirstChild("HumanoidRootPart")
+    if R then
+        pcall(function()
+            R.AssemblyLinearVelocity = Vector3.zero
+            R.AssemblyAngularVelocity = Vector3.zero
+        end)
+        for _, c in ipairs(R:GetChildren()) do
+            if c.Name == "YokudoBV" or c.Name == "YokudoBG" then
+                pcall(function() c:Destroy() end)
+            end
+        end
+    end
+    local Animate = C:FindFirstChild("Animate")
+    if Animate then
+        task.spawn(function()
+            pcall(function()
+                Animate.Disabled = true
+                task.wait(0.1)
+                Animate.Disabled = false
+            end)
+        end)
+    end
+    pcall(function()
+        local PS = Player:FindFirstChild("PlayerScripts")
+        if not PS then return end
+        local PM = PS:FindFirstChild("PlayerModule")
+        if not PM then return end
+        local ok, M = pcall(function() return require(PM) end)
+        if not ok or not M then return end
+        local Ctrl
+        pcall(function() Ctrl = M:GetControls() end)
+        if not Ctrl then return end
+        pcall(function() Ctrl:OnCharacterAdded(C) end)
+        pcall(function() Ctrl:UpdateActiveControlModuleEnabled() end)
+    end)
+end
+
+--==================================================
+-- UI ROOT (com RESIZE)
+--==================================================
+SafeCall("UI", function()
+    local GuiParent = game:GetService("CoreGui")
+    pcall(function()
+        if type(gethui) == "function" then local H = gethui() if H then GuiParent = H end end
+    end)
+    pcall(function()
+        local O1 = GuiParent:FindFirstChild("YOKUDO_HUB") if O1 then O1:Destroy() end
+        local O2 = GuiParent:FindFirstChild("ToggleGUI") if O2 then O2:Destroy() end
+    end)
+    pcall(function() ContentProvider:PreloadAsync({_G.YOKUDO.AssetID}) end)
+
+    -- FLOATING BUTTON
+    local ToggleGui = Instance.new("ScreenGui")
+    ToggleGui.Name = "ToggleGUI" ToggleGui.ResetOnSpawn = false
+    ToggleGui.IgnoreGuiInset = true ToggleGui.Enabled = false
+    ToggleGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ToggleGui.Parent = GuiParent
+
+    local Toggle = Instance.new("ImageButton")
+    Toggle.Size = UDim2.new(0,60,0,60) Toggle.Position = UDim2.new(0.02,0,0.5,-30)
+    Toggle.BackgroundColor3 = T.SurfaceHi Toggle.BorderSizePixel = 0
+    Toggle.Image = _G.YOKUDO.AssetID Toggle.ZIndex = 999 Toggle.Parent = ToggleGui
+    Toggle.Active = true
+    Instance.new("UICorner", Toggle).CornerRadius = UDim.new(1,0)
+    local ts = Instance.new("UIStroke", Toggle)
+    ts.Color = T.Primary ts.Thickness = 2 ts.Transparency = 0.2
+
+    local tDrag, tDragStart, tStartPos, tActiveTouch, tMoved = false, nil, nil, nil, false
+
+    Toggle.InputBegan:Connect(function(I)
+        if I.UserInputType == Enum.UserInputType.MouseButton1 or I.UserInputType == Enum.UserInputType.Touch then
+            tDrag = true
+            tDragStart = I.Position
+            tStartPos = Toggle.Position
+            tMoved = false
+            if I.UserInputType == Enum.UserInputType.Touch then tActiveTouch = I end
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(I)
+        if not tDrag then return end
+        if I.UserInputType == Enum.UserInputType.Touch then
+            if tActiveTouch and I ~= tActiveTouch then return end
+        end
+        if I.UserInputType ~= Enum.UserInputType.MouseMovement and I.UserInputType ~= Enum.UserInputType.Touch then return end
+        local D = I.Position - tDragStart
+        if math.abs(D.X) > 4 or math.abs(D.Y) > 4 then tMoved = true end
+        Toggle.Position = UDim2.new(tStartPos.X.Scale, tStartPos.X.Offset + D.X, tStartPos.Y.Scale, tStartPos.Y.Offset + D.Y)
+    end)
+    UserInputService.InputEnded:Connect(function(I)
+        if I.UserInputType == Enum.UserInputType.Touch then
+            if tActiveTouch and I == tActiveTouch then
+                tDrag = false tActiveTouch = nil
+            end
+            return
+        end
+        if I.UserInputType == Enum.UserInputType.MouseButton1 then tDrag = false end
+    end)
+
+    -- MAIN
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "YOKUDO_HUB" ScreenGui.ResetOnSpawn = false
+    ScreenGui.IgnoreGuiInset = true ScreenGui.DisplayOrder = 999
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.Parent = GuiParent
+
+    local Main = Instance.new("Frame")
+    Main.Size = UDim2.new(0,_G.YOKUDO.UI.Width,0,_G.YOKUDO.UI.Height)
+    Main.Position = UDim2.new(0.5,-_G.YOKUDO.UI.Width/2,0.5,-_G.YOKUDO.UI.Height/2)
+    Main.BackgroundColor3 = T.Background Main.BorderSizePixel = 0
+    Main.ClipsDescendants = true Main.Active = true Main.Parent = ScreenGui
+    Instance.new("UICorner", Main).CornerRadius = UDim.new(0,16)
+    local mb = Instance.new("UIStroke", Main)
+    mb.Color = T.Divider mb.Thickness = 1 mb.Transparency = 0.4
+
+    local TopBar = Instance.new("Frame")
+    TopBar.Name = "TopBar" TopBar.Size = UDim2.new(1,0,0,68)
+    TopBar.BackgroundColor3 = T.Surface TopBar.BorderSizePixel = 0
+    TopBar.Active = true TopBar.ZIndex = 20 TopBar.Parent = Main
+    Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0,16)
+    local TBFix = Instance.new("Frame")
+    TBFix.Size = UDim2.new(1,0,0,16) TBFix.Position = UDim2.new(0,0,1,-16)
+    TBFix.BackgroundColor3 = T.Surface TBFix.BorderSizePixel = 0
+    TBFix.ZIndex = 20 TBFix.Parent = TopBar
+
+    local Dot = Instance.new("Frame")
+    Dot.Size = UDim2.new(0,10,0,10) Dot.Position = UDim2.new(0,22,0,24)
+    Dot.BackgroundColor3 = T.Primary Dot.BorderSizePixel = 0 Dot.ZIndex = 22 Dot.Parent = TopBar
+    Instance.new("UICorner", Dot).CornerRadius = UDim.new(1,0)
+
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1,-160,0,26) Title.Position = UDim2.new(0,40,0,12)
+    Title.BackgroundTransparency = 1 Title.Text = "BY THZIN"
+    Title.TextColor3 = T.Text Title.TextSize = 19
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Font = Enum.Font.GothamBold Title.ZIndex = 22 Title.Parent = TopBar
+
+    local Sub = Instance.new("TextLabel")
+    Sub.Size = UDim2.new(1,-160,0,16) Sub.Position = UDim2.new(0,40,0,38)
+    Sub.BackgroundTransparency = 1 Sub.Text = "Steal An Egg  •  v5.0"
+    Sub.TextColor3 = T.SubText Sub.TextSize = 11
+    Sub.TextXAlignment = Enum.TextXAlignment.Left
+    Sub.Font = Enum.Font.GothamMedium Sub.ZIndex = 22 Sub.Parent = TopBar
+
+    local Sidebar = Instance.new("Frame")
+    Sidebar.Size = UDim2.new(0,_G.YOKUDO.UI.SidebarWidth,1,-68)
+    Sidebar.Position = UDim2.new(0,0,0,68)
+    Sidebar.BackgroundColor3 = T.Background Sidebar.BorderSizePixel = 0
+    Sidebar.ZIndex = 5 Sidebar.Parent = Main
+
+    local TabScroll = Instance.new("ScrollingFrame")
+    TabScroll.Size = UDim2.new(1,0,1,0) TabScroll.BackgroundTransparency = 1
+    TabScroll.BorderSizePixel = 0 TabScroll.CanvasSize = UDim2.new(0,0,0,0)
+    TabScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    TabScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+    TabScroll.ScrollBarThickness = 0 TabScroll.Active = true
+    TabScroll.ZIndex = 6 TabScroll.Parent = Sidebar
+    local pad = Instance.new("UIPadding", TabScroll)
+    pad.PaddingTop = UDim.new(0,10) pad.PaddingBottom = UDim.new(0,10)
+    pad.PaddingLeft = UDim.new(0,8) pad.PaddingRight = UDim.new(0,8)
+    local lay = Instance.new("UIListLayout", TabScroll)
+    lay.Padding = UDim.new(0,4) lay.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local Content = Instance.new("Frame")
+    Content.Size = UDim2.new(1,-_G.YOKUDO.UI.SidebarWidth,1,-68)
+    Content.Position = UDim2.new(0,_G.YOKUDO.UI.SidebarWidth,0,68)
+    Content.BackgroundColor3 = T.Background Content.BorderSizePixel = 0
+    Content.ZIndex = 5 Content.Parent = Main
+
+    _G.YOKUDO_Main = Main _G.YOKUDO_TopBar = TopBar
+    _G.YOKUDO_Sidebar = Sidebar
+    _G.YOKUDO_TabScroll = TabScroll _G.YOKUDO_Content = Content
+    _G.YOKUDO_ScreenGui = ScreenGui _G.YOKUDO_ToggleGui = ToggleGui
+
+    -- DRAG MAIN
+    local drag, ds, sp = false, nil, nil
+    TopBar.InputBegan:Connect(function(I)
+        if I.UserInputType == Enum.UserInputType.MouseButton1 or I.UserInputType == Enum.UserInputType.Touch then
+            drag = true ds = I.Position sp = Main.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(I)
+        if not drag then return end
+        if I.UserInputType ~= Enum.UserInputType.MouseMovement and I.UserInputType ~= Enum.UserInputType.Touch then return end
+        local D = I.Position - ds
+        Main.Position = UDim2.new(sp.X.Scale, sp.X.Offset + D.X, sp.Y.Scale, sp.Y.Offset + D.Y)
+    end)
+    UserInputService.InputEnded:Connect(function(I)
+        if I.UserInputType == Enum.UserInputType.MouseButton1 or I.UserInputType == Enum.UserInputType.Touch then drag = false end
+    end)
+
+    -- 🔧 RESIZE HANDLE
+    local ResizeHandle = Instance.new("TextButton")
+    ResizeHandle.Name = "ResizeHandle"
+    ResizeHandle.Size = UDim2.new(0, 22, 0, 22)
+    ResizeHandle.Position = UDim2.new(1, -26, 1, -26)
+    ResizeHandle.BackgroundColor3 = T.Primary
+    ResizeHandle.BackgroundTransparency = 0.4
+    ResizeHandle.BorderSizePixel = 0
+    ResizeHandle.Text = "◢"
+    ResizeHandle.TextColor3 = T.Background
+    ResizeHandle.TextSize = 14
+    ResizeHandle.Font = Enum.Font.GothamBold
+    ResizeHandle.AutoButtonColor = false
+    ResizeHandle.ZIndex = 100
+    ResizeHandle.Active = true
+    ResizeHandle.Parent = Main
+    Instance.new("UICorner", ResizeHandle).CornerRadius = UDim.new(0, 6)
+
+    local MIN_W, MIN_H = 380, 280
+    local MAX_W, MAX_H = 900, 700
+
+    local rDrag, rStart, rStartSize, rActiveTouch = false, nil, nil, nil
+
+    ResizeHandle.InputBegan:Connect(function(I)
+        if I.UserInputType == Enum.UserInputType.MouseButton1 or I.UserInputType == Enum.UserInputType.Touch then
+            rDrag = true
+            rStart = I.Position
+            rStartSize = Main.AbsoluteSize
+            if I.UserInputType == Enum.UserInputType.Touch then rActiveTouch = I end
+            TweenService:Create(ResizeHandle, TweenInfo.new(0.1), {BackgroundTransparency = 0}):Play()
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(I)
+        if not rDrag then return end
+        if I.UserInputType == Enum.UserInputType.Touch then
+            if rActiveTouch and I ~= rActiveTouch then return end
+        end
+        if I.UserInputType ~= Enum.UserInputType.MouseMovement and I.UserInputType ~= Enum.UserInputType.Touch then return end
+        local delta = I.Position - rStart
+        local newW = math.clamp(rStartSize.X + delta.X, MIN_W, MAX_W)
+        local newH = math.clamp(rStartSize.Y + delta.Y, MIN_H, MAX_H)
+        Main.Size = UDim2.new(0, newW, 0, newH)
+        local sidebarW = math.clamp(math.floor(newW * 0.25), 110, 200)
+        Sidebar.Size = UDim2.new(0, sidebarW, 1, -68)
+        Content.Size = UDim2.new(1, -sidebarW, 1, -68)
+        Content.Position = UDim2.new(0, sidebarW, 0, 68)
+    end)
+
+    UserInputService.InputEnded:Connect(function(I)
+        if I.UserInputType == Enum.UserInputType.Touch then
+            if rActiveTouch and I == rActiveTouch then
+                rDrag = false rActiveTouch = nil
+                TweenService:Create(ResizeHandle, TweenInfo.new(0.15), {BackgroundTransparency = 0.4}):Play()
+            end
+            return
+        end
+        if I.UserInputType == Enum.UserInputType.MouseButton1 then
+            if rDrag then
+                rDrag = false
+                TweenService:Create(ResizeHandle, TweenInfo.new(0.15), {BackgroundTransparency = 0.4}):Play()
+            end
+        end
+    end)
+
+    -- BOTÕES ✕ / —
+    local function MakeIconBtn(sym, xOff, bgColor)
+        local B = Instance.new("TextButton")
+        B.Size = UDim2.new(0,26,0,26) B.Position = UDim2.new(1,xOff,0,21)
+        B.BackgroundColor3 = bgColor B.BackgroundTransparency = 0.85
+        B.BorderSizePixel = 0 B.Text = sym B.TextColor3 = T.Text
+        B.TextSize = 15 B.Font = Enum.Font.GothamBold B.ZIndex = 30 B.Parent = TopBar
+        Instance.new("UICorner", B).CornerRadius = UDim.new(1,0)
+        B.MouseEnter:Connect(function() TweenService:Create(B, TweenInfo.new(0.15), {BackgroundTransparency = 0.4}):Play() end)
+        B.MouseLeave:Connect(function() TweenService:Create(B, TweenInfo.new(0.15), {BackgroundTransparency = 0.85}):Play() end)
+        return B
+    end
+    local CloseBtn = MakeIconBtn("✕", -68, T.Danger)
+    local MinBtn = MakeIconBtn("—", -38, T.SurfaceHi2)
+
+    CloseBtn.MouseButton1Click:Connect(function()
+        for _, k in ipairs({"YOKUDO_WalkSpeed","YOKUDO_AntiTrap","YOKUDO_GodMode","YOKUDO_TeleportSystem","YOKUDO_AutoFarm","YOKUDO_AutoAttack","YOKUDO_AFKSystem","YOKUDO_AttackDrone","YOKUDO_ManagerDrone","YOKUDO_ManualFastClick"}) do
+            local f = _G[k]
+            if f then
+                if f.Disable then pcall(function() f.Disable() end) end
+                if f.Stop then pcall(function() f.Stop() end) end
+            end
+        end
+        ResetCharacterState()
+        pcall(function() ScreenGui:Destroy() end)
+        pcall(function() ToggleGui:Destroy() end)
+    end)
+
+    MinBtn.MouseButton1Click:Connect(function()
+        ScreenGui.Enabled = false
+        ToggleGui.Enabled = true
+    end)
+
+    Toggle.MouseButton1Click:Connect(function()
+        if tMoved then return end
+        ScreenGui.Enabled = true
+        ToggleGui.Enabled = false
+    end)
+end)
+
+--==================================================
+-- COMPONENTS
+--==================================================
+local function GetTabTextSize(N)
+    local L = #N
+    if L >= 14 then return 11 elseif L >= 10 then return 12 else return 13 end
+end
+local function CreateTab(Name, Order)
+    local Tab = Instance.new("TextButton")
+    Tab.Name = Name:gsub("%s+","_") .. "_Tab"
+    Tab.Size = UDim2.new(1,0,0,38) Tab.BackgroundColor3 = T.Surface
+    Tab.BackgroundTransparency = 1 Tab.BorderSizePixel = 0 Tab.Text = ""
+    Tab.AutoButtonColor = false Tab.LayoutOrder = Order or 1
+    Tab.ZIndex = 7 Tab.Parent = _G.YOKUDO_TabScroll
+    Instance.new("UICorner", Tab).CornerRadius = UDim.new(0,10)
+    local Ind = Instance.new("Frame")
+    Ind.Name = "Indicator" Ind.Size = UDim2.new(0,4,0,20)
+    Ind.Position = UDim2.new(0,6,0.5,-10) Ind.BackgroundColor3 = T.Primary
+    Ind.BackgroundTransparency = 1 Ind.BorderSizePixel = 0
+    Ind.ZIndex = 8 Ind.Parent = Tab
+    Instance.new("UICorner", Ind).CornerRadius = UDim.new(1,0)
+    local TT = Instance.new("TextLabel")
+    TT.Name = "TabText" TT.Size = UDim2.new(1,-24,1,0)
+    TT.Position = UDim2.new(0,18,0,0) TT.BackgroundTransparency = 1
+    TT.Text = Name TT.TextColor3 = T.SubText
+    TT.TextSize = GetTabTextSize(Name)
+    TT.TextXAlignment = Enum.TextXAlignment.Left
+    TT.TextYAlignment = Enum.TextYAlignment.Center
+    TT.Font = Enum.Font.GothamMedium TT.TextTruncate = Enum.TextTruncate.AtEnd
+    TT.ZIndex = 8 TT.Parent = Tab
+    AddRipple(Tab, T.Primary)
+    return Tab
+end
+local function CreatePage(Name)
+    local Page = Instance.new("ScrollingFrame")
+    Page.Name = Name .. "_Page" Page.Size = UDim2.new(1,0,1,0)
+    Page.BackgroundTransparency = 1 Page.BorderSizePixel = 0
+    Page.Visible = false Page.CanvasSize = UDim2.new(0,0,0,0)
+    Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    Page.ScrollingDirection = Enum.ScrollingDirection.Y
+    Page.ScrollBarThickness = 4 Page.ScrollBarImageColor3 = T.Divider
+    Page.ScrollBarImageTransparency = 0.2 Page.ZIndex = 6
+    Page.Parent = _G.YOKUDO_Content
+    local p = Instance.new("UIPadding", Page)
+    p.PaddingTop = UDim.new(0,14) p.PaddingBottom = UDim.new(0,16)
+    p.PaddingLeft = UDim.new(0,16) p.PaddingRight = UDim.new(0,14)
+    local l = Instance.new("UIListLayout", Page)
+    l.Padding = UDim.new(0,8) l.SortOrder = Enum.SortOrder.LayoutOrder
+    return Page
+end
+local function SectionTitle(Parent, TextValue, Order)
+    local L = Instance.new("TextLabel")
+    L.Size = UDim2.new(1,0,0,26) L.BackgroundTransparency = 1
+    L.Text = string.upper(TextValue) L.TextColor3 = T.Primary
+    L.TextSize = 11 L.TextXAlignment = Enum.TextXAlignment.Left
+    L.TextYAlignment = Enum.TextYAlignment.Center
+    L.Font = Enum.Font.GothamBold L.LayoutOrder = Order or 1
+    L.ZIndex = 8 L.Parent = Parent
+    return L
+end
+local function CreateCard(Parent, Order, Height)
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1,0,0,Height) Card.BackgroundColor3 = T.Surface
+    Card.BorderSizePixel = 0 Card.LayoutOrder = Order or 1 Card.Parent = Parent
+    Instance.new("UICorner", Card).CornerRadius = UDim.new(0,12)
+    local s = Instance.new("UIStroke", Card)
+    s.Color = T.Divider s.Thickness = 1 s.Transparency = 0.6
+    return Card
+end
+local function CreateToggleCard(Parent, Order, Title, Subtitle, OnFunc, OffFunc)
+    local Card = CreateCard(Parent, Order, Subtitle and 60 or 52)
+    local L = Instance.new("TextLabel")
+    L.Size = UDim2.new(1,-80,0,Subtitle and 22 or 52)
+    L.Position = UDim2.new(0,16,0,Subtitle and 10 or 0)
+    L.BackgroundTransparency = 1 L.Text = Title L.TextColor3 = T.Text
+    L.TextSize = 13 L.TextXAlignment = Enum.TextXAlignment.Left
+    L.TextYAlignment = Subtitle and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center
+    L.Font = Enum.Font.GothamBold L.ZIndex = 9 L.Parent = Card
+    if Subtitle then
+        local SL = Instance.new("TextLabel")
+        SL.Size = UDim2.new(1,-80,0,16) SL.Position = UDim2.new(0,16,0,32)
+        SL.BackgroundTransparency = 1 SL.Text = Subtitle
+        SL.TextColor3 = T.SubText SL.TextSize = 10
+        SL.TextXAlignment = Enum.TextXAlignment.Left
+        SL.Font = Enum.Font.Gotham SL.ZIndex = 9 SL.Parent = Card
+    end
+    local Switch = Instance.new("TextButton")
+    Switch.Size = UDim2.new(0,44,0,24) Switch.Position = UDim2.new(1,-60,0.5,-12)
+    Switch.BackgroundColor3 = T.SurfaceHi2 Switch.BorderSizePixel = 0
+    Switch.Text = "" Switch.AutoButtonColor = false Switch.ZIndex = 10 Switch.Parent = Card
+    Instance.new("UICorner", Switch).CornerRadius = UDim.new(1,0)
+    local Knob = Instance.new("Frame")
+    Knob.Size = UDim2.new(0,18,0,18) Knob.Position = UDim2.new(0,3,0.5,-9)
+    Knob.BackgroundColor3 = T.SubText Knob.BorderSizePixel = 0
+    Knob.ZIndex = 11 Knob.Parent = Switch
+    Instance.new("UICorner", Knob).CornerRadius = UDim.new(1,0)
+    local Enabled = false
+    local function UpdateUI(state, anim)
+        Enabled = state
+        local info = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        if anim then
+            TweenService:Create(Switch, info, {BackgroundColor3 = state and T.Primary or T.SurfaceHi2}):Play()
+            TweenService:Create(Knob, info, {
+                Position = state and UDim2.new(1,-21,0.5,-9) or UDim2.new(0,3,0.5,-9),
+                BackgroundColor3 = state and T.Background or T.SubText
+            }):Play()
+        else
+            Switch.BackgroundColor3 = state and T.Primary or T.SurfaceHi2
+            Knob.Position = state and UDim2.new(1,-21,0.5,-9) or UDim2.new(0,3,0.5,-9)
+            Knob.BackgroundColor3 = state and T.Background or T.SubText
+        end
+    end
+    Switch.MouseButton1Click:Connect(function()
+        local new = not Enabled
+        UpdateUI(new, true)
+        if new then if OnFunc then pcall(OnFunc) end else if OffFunc then pcall(OffFunc) end end
+    end)
+    return Card, {UpdateUI = UpdateUI, Get = function() return Enabled end}
+end
+local function CreateButtonCard(Parent, Order, Title, Subtitle, BtnText, OnClick, Color)
+    local Card = CreateCard(Parent, Order, Subtitle and 64 or 52)
+    local L = Instance.new("TextLabel")
+    L.Size = UDim2.new(1,-110,0,Subtitle and 22 or 52)
+    L.Position = UDim2.new(0,16,0,Subtitle and 10 or 0)
+    L.BackgroundTransparency = 1 L.Text = Title L.TextColor3 = T.Text
+    L.TextSize = 13 L.TextXAlignment = Enum.TextXAlignment.Left
+    L.TextYAlignment = Subtitle and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center
+    L.Font = Enum.Font.GothamBold L.ZIndex = 9 L.Parent = Card
+    if Subtitle then
+        local SL = Instance.new("TextLabel")
+        SL.Size = UDim2.new(1,-110,0,16) SL.Position = UDim2.new(0,16,0,32)
+        SL.BackgroundTransparency = 1 SL.Text = Subtitle
+        SL.TextColor3 = T.SubText SL.TextSize = 10
+        SL.TextXAlignment = Enum.TextXAlignment.Left
+        SL.Font = Enum.Font.Gotham SL.ZIndex = 9 SL.Parent = Card
+    end
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(0,84,0,32) Btn.Position = UDim2.new(1,-100,0.5,-16)
+    Btn.BackgroundColor3 = Color or T.Primary Btn.BorderSizePixel = 0
+    Btn.Text = BtnText Btn.TextColor3 = T.Background
+    Btn.TextSize = 12 Btn.Font = Enum.Font.GothamBold
+    Btn.AutoButtonColor = false Btn.ZIndex = 10 Btn.Parent = Card
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0,8)
+    AddRipple(Btn, T.Background)
+    Btn.MouseButton1Click:Connect(function() if OnClick then pcall(OnClick) end end)
+    return Card, Btn
+end
+local function CreateTextboxCard(Parent, Order, Title, Subtitle, Default, OnChange)
+    local Card = CreateCard(Parent, Order, 64)
+    local L = Instance.new("TextLabel")
+    L.Size = UDim2.new(1,-110,0,22) L.Position = UDim2.new(0,16,0,10)
+    L.BackgroundTransparency = 1 L.Text = Title L.TextColor3 = T.Text
+    L.TextSize = 13 L.TextXAlignment = Enum.TextXAlignment.Left
+    L.Font = Enum.Font.GothamBold L.ZIndex = 9 L.Parent = Card
+    local SL = Instance.new("TextLabel")
+    SL.Size = UDim2.new(1,-110,0,16) SL.Position = UDim2.new(0,16,0,32)
+    SL.BackgroundTransparency = 1 SL.Text = Subtitle or ""
+    SL.TextColor3 = T.SubText SL.TextSize = 10
+    SL.TextXAlignment = Enum.TextXAlignment.Left
+    SL.Font = Enum.Font.Gotham SL.ZIndex = 9 SL.Parent = Card
+    local Box = Instance.new("TextBox")
+    Box.Size = UDim2.new(0,84,0,32) Box.Position = UDim2.new(1,-100,0.5,-16)
+    Box.BackgroundColor3 = T.SurfaceHi Box.BorderSizePixel = 0
+    Box.Text = tostring(Default) Box.TextColor3 = T.Text
+    Box.TextSize = 13 Box.Font = Enum.Font.GothamBold
+    Box.ZIndex = 10 Box.Parent = Card
+    Instance.new("UICorner", Box).CornerRadius = UDim.new(0,8)
+    local bS = Instance.new("UIStroke", Box)
+    bS.Color = T.Divider bS.Thickness = 1 bS.Transparency = 0.4
+    Box.Focused:Connect(function()
+        TweenService:Create(bS, TweenInfo.new(0.15), {Color = T.Primary, Transparency = 0}):Play()
+    end)
+    Box.FocusLost:Connect(function()
+        TweenService:Create(bS, TweenInfo.new(0.15), {Color = T.Divider, Transparency = 0.4}):Play()
+        if OnChange then pcall(function() OnChange(tonumber(Box.Text)) end) end
+    end)
+    return Card, Box
+end
+
+--==================================================
+-- TABS MANAGER
+--==================================================
+local TM = {Tabs = {}}
+function TM:RegisterTab(Name, Order, PageName)
+    local Tab = CreateTab(Name, Order)
+    local Page = CreatePage(PageName or Name:upper())
+    table.insert(self.Tabs, {Tab = Tab, Page = Page, Name = Name})
+    Tab.MouseButton1Click:Connect(function() self:SelectTab(Tab, Page) end)
+    return Tab, Page
+end
+function TM:SelectTab(SelT, SelP)
+    for _, d in ipairs(self.Tabs) do
+        d.Page.Visible = false
+        local I = d.Tab:FindFirstChild("Indicator")
+        local TT = d.Tab:FindFirstChild("TabText")
+        TweenService:Create(d.Tab, TweenInfo.new(0.18), {BackgroundTransparency = 1}):Play()
+        if I then TweenService:Create(I, TweenInfo.new(0.18), {BackgroundTransparency = 1}):Play() end
+        if TT then TweenService:Create(TT, TweenInfo.new(0.18), {TextColor3 = T.SubText}):Play() end
+    end
+    SelP.Visible = true
+    task.wait(0.05)
+    pcall(function() SelP.CanvasPosition = Vector2.new(0,0) end)
+    TweenService:Create(SelT, TweenInfo.new(0.18), {BackgroundTransparency = 0}):Play()
+    local I = SelT:FindFirstChild("Indicator")
+    local TT = SelT:FindFirstChild("TabText")
+    if I then TweenService:Create(I, TweenInfo.new(0.18), {BackgroundTransparency = 0}):Play() end
+    if TT then TweenService:Create(TT, TweenInfo.new(0.18), {TextColor3 = T.Text}):Play() end
+    self.ActiveTab = SelT self.ActivePage = SelP
+end
+function TM:SelectTabByName(Name)
+    for _, d in ipairs(self.Tabs) do
+        if d.Name == Name then self:SelectTab(d.Tab, d.Page) return end
+    end
+end
+_G.YOKUDO_TabsManager = TM
+
+--==================================================
+-- FEATURES
+--==================================================
+SafeCall("WalkSpeed", function()
+    local Enabled, Value, Orig, Conn = false, 50, 16, nil
+    local function GetHum()
+        local C = Player.Character if not C then return nil end
+        return C:FindFirstChildOfClass("Humanoid")
+    end
+    local function Apply() local H = GetHum() if H then H.WalkSpeed = Value end end
+    _G.YOKUDO_WalkSpeed = {
+        Toggle = function()
+            Enabled = not Enabled
+            if Enabled then
+                local H = GetHum() if H then Orig = H.WalkSpeed end
+                Apply()
+                if Conn then Conn:Disconnect() end
+                Conn = RunService.Heartbeat:Connect(function() if Enabled then Apply() end end)
+            else
+                local H = GetHum() if H then H.WalkSpeed = Orig end
+                if Conn then Conn:Disconnect() Conn = nil end
+            end
+        end,
+        Enable = function() if not Enabled then _G.YOKUDO_WalkSpeed.Toggle() end end,
+        Disable = function() if Enabled then _G.YOKUDO_WalkSpeed.Toggle() end end,
+        SetValue = function(v) Value = math.clamp(v,50,1000) if Enabled then Apply() end end,
+        IsEnabled = function() return Enabled end,
+        GetValue = function() return Value end,
+    }
+    Player.CharacterAdded:Connect(function()
+        if Enabled then task.wait(1) local H = GetHum() if H then Orig = H.WalkSpeed end Apply() end
+    end)
+end)
+
+SafeCall("AntiTrap", function()
+    local Enabled = false
+    local function Remove()
+        local F = workspace:FindFirstChild("__DEBRIS")
+        if not F then return end
+        for _, c in ipairs(F:GetChildren()) do pcall(function() c:Destroy() end) end
+    end
+    _G.YOKUDO_AntiTrap = {
+        Enable = function()
+            if Enabled then return end
+            Enabled = true Remove()
+            task.spawn(function() while Enabled do task.wait(1) if Enabled then Remove() end end end)
+        end,
+        Disable = function() Enabled = false end,
+        Toggle = function() if Enabled then _G.YOKUDO_AntiTrap.Disable() else _G.YOKUDO_AntiTrap.Enable() end end,
+        IsEnabled = function() return Enabled end,
+    }
+end)
+
+SafeCall("GodMode", function()
+    local Enabled, Conn = false, nil
+    local function Replace()
+        local C = Player.Character if not C then return end
+        local Old = C:FindFirstChildOfClass("Humanoid") if not Old then return end
+        local New = Old:Clone() New.Name = Old.Name
+        for _, Ch in ipairs(Old:GetChildren()) do
+            local Ex = New:FindFirstChild(Ch.Name)
+            if Ex then pcall(function() Ex:Destroy() end) end
+            pcall(function() Ch.Parent = New end)
+        end
+        Old:Destroy() task.wait() New.Parent = C task.wait()
+        if not New.Parent then return end
+        pcall(function()
+            New:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+            New.BreakJointsOnDeath = false New.RequiresNeck = false
+            New.MaxHealth = math.huge New.Health = math.huge
+        end)
+        local Ani = New:FindFirstChildOfClass("Animator")
+        if not Ani then Ani = Instance.new("Animator") Ani.Parent = New end
+        pcall(function()
+            local PS = Player:FindFirstChild("PlayerScripts")
+            if not PS then return end
+            local PM = PS:FindFirstChild("PlayerModule")
+            if not PM then return end
+            local ok, M = pcall(function() return require(PM) end)
+            if not ok or not M then return end
+            local Ctrl pcall(function() Ctrl = M:GetControls() end)
+            if not Ctrl then return end
+            pcall(function() Ctrl:OnCharacterAdded(C) end)
+            task.wait()
+            pcall(function() Ctrl:UpdateActiveControlModuleEnabled() end)
+        end)
+        pcall(function()
+            local Cam = workspace.CurrentCamera
+            if Cam then Cam.CameraSubject = New end
+        end)
+        local Animate = C:FindFirstChild("Animate")
+        if Animate then
+            pcall(function() Animate.Disabled = true end)
+            task.wait()
+            pcall(function() Animate.Disabled = false end)
+        end
+        if Conn then Conn:Disconnect() end
+        Conn = RunService.Heartbeat:Connect(function()
+            if not Enabled then return end
+            local Ch = Player.Character if not Ch then return end
+            local H = Ch:FindFirstChildOfClass("Humanoid") if not H then return end
+            pcall(function()
+                if H.Health < H.MaxHealth then H.Health = H.MaxHealth end
+                H.MaxHealth = math.huge H.Health = math.huge
+                H:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+                H.BreakJointsOnDeath = false H.RequiresNeck = false
+            end)
+        end)
+    end
+    _G.YOKUDO_GodMode = {
+        Enable = function() Enabled = true task.spawn(Replace) end,
+        Disable = function()
+            Enabled = false
+            if Conn then Conn:Disconnect() Conn = nil end
+            ResetCharacterState()
+        end,
+        Toggle = function() if Enabled then _G.YOKUDO_GodMode.Disable() else _G.YOKUDO_GodMode.Enable() end end,
+        IsEnabled = function() return Enabled end,
+    }
+end)
+
+SafeCall("TeleportSystem", function()
+    local Container = workspace:FindFirstChild("AreaEggSlotsClient") or workspace:WaitForChild("AreaEggSlotsClient", 15)
+    local CollectEvent, ForestStrike
+    pcall(function() CollectEvent = ReplicatedStorage.Packages.Networking["RF/EggWorld/AskFieldEggCarry"] end)
+    pcall(function() ForestStrike = ReplicatedStorage.Packages.Networking["RE/GuardPatrol/ForestStrike"] end)
+    local TARGET_UID, SPEED, METHOD = nil, 300, "TeleportFly"
+    local SAFE_ZONE = Vector3.new(533,70,-366)
+    local Running = false
+    local C1, C2, BV, BG = nil, nil, nil, nil
+    local FirstList, FirstUid, FirstKey = {}, nil, nil
+    local CollectDone, TgtDone = false, false
+    local SavedTarget = nil
+    local function GetHum()
+        local C = Player.Character if not C then return nil, nil end
+        return C:FindFirstChildOfClass("Humanoid"), C:FindFirstChild("HumanoidRootPart")
+    end
+    local function Cleanup()
+        if C1 then C1:Disconnect() C1 = nil end
+        if C2 then C2:Disconnect() C2 = nil end
+        if BV then pcall(function() BV:Destroy() end) BV = nil end
+        if BG then pcall(function() BG:Destroy() end) BG = nil end
+        local H, R = GetHum()
+        if R then
+            for _, c in ipairs(R:GetChildren()) do
+                if c.Name == "YokudoBV" or c.Name == "YokudoBG" then pcall(function() c:Destroy() end) end
+            end
+        end
+        if H then pcall(function() H.PlatformStand = false H.Sit = false end) end
+        if R then pcall(function()
+            R.AssemblyLinearVelocity = Vector3.zero
+            R.AssemblyAngularVelocity = Vector3.zero
+        end) end
+    end
+    local function GetPos(O)
+        if not O then return nil end
+        if O:IsA("Model") then
+            if O.PrimaryPart then return O.PrimaryPart.Position end
+            local P = O:FindFirstChildWhichIsA("BasePart")
+            if P then return P.Position end
+            for _, d in ipairs(O:GetDescendants()) do
+                if d:IsA("BasePart") then return d.Position end
+            end
+        elseif O:IsA("BasePart") then return O.Position end
+    end
+    local function Lock(P, L)
+        local LC = CFrame.new(P, L or (P + Vector3.new(0,0,-1)))
+        if C2 then C2:Disconnect() end
+        C2 = RunService.Heartbeat:Connect(function()
+            if not Running then if C2 then C2:Disconnect() C2 = nil end return end
+            local _, R = GetHum() if not R then return end
+            R.CFrame = LC
+            R.AssemblyLinearVelocity = Vector3.zero
+            R.AssemblyAngularVelocity = Vector3.zero
+        end)
+    end
+    local function FlyTP(Dest, Sp, Shot, Safe, Cb)
+        Cleanup()
+        local H, R = GetHum()
+        if not H or not R or H.Health <= 0 then if Cb then Cb() end return end
+        local Fly = Vector3.new(Dest.X, Dest.Y+25, Dest.Z)
+        local LC = CFrame.new(Dest + Vector3.new(0,2,0))
+        H.PlatformStand = true
+        BV = Instance.new("BodyVelocity") BV.Name = "YokudoBV"
+        BV.MaxForce = Vector3.new(math.huge,math.huge,math.huge)
+        BV.P = 1250 BV.Velocity = Vector3.zero BV.Parent = R
+        BG = Instance.new("BodyGyro") BG.Name = "YokudoBG"
+        BG.MaxTorque = Vector3.new(math.huge,math.huge,math.huge)
+        BG.P = 3000 BG.D = 500 BG.CFrame = R.CFrame BG.Parent = R
+        local Start, ShotDone = tick(), false
+        C1 = RunService.Heartbeat:Connect(function()
+            if not Running then Cleanup() return end
+            local H2, R2 = GetHum()
+            if not H2 or not R2 or H2.Health <= 0 then Cleanup() return end
+            if not BV or not BG then Cleanup() return end
+            local P = R2.Position
+            local D = Fly - P
+            local HD = Vector3.new(D.X,0,D.Z).Magnitude
+            local VD = math.abs(D.Y)
+            if Safe and HD <= 3 then
+                Cleanup() R2.CFrame = LC
+                R2.AssemblyLinearVelocity = Vector3.zero R2.AssemblyAngularVelocity = Vector3.zero
+                Lock(Dest) if Cb then Cb() end return
+            end
+            if not Safe and Shot and not ShotDone and HD <= 30 then
+                ShotDone = true Cleanup() R2.CFrame = LC
+                R2.AssemblyLinearVelocity = Vector3.zero R2.AssemblyAngularVelocity = Vector3.zero
+                Lock(Dest) if Cb then Cb() end return
+            end
+            if HD <= 2 and VD <= 2 then
+                Cleanup() R2.CFrame = LC
+                R2.AssemblyLinearVelocity = Vector3.zero R2.AssemblyAngularVelocity = Vector3.zero
+                Lock(Dest) if Cb then Cb() end return
+            end
+            if tick()-Start > 30 then Cleanup() if Cb then Cb() end return end
+            if D.Magnitude > 1 then BV.Velocity = D.Unit * Sp else BV.Velocity = Vector3.zero end
+            BG.CFrame = CFrame.new(P, P + Vector3.new(D.X,0,D.Z))
+        end)
+    end
+    local function InstantTP(Dest, Cb)
+        Cleanup()
+        local H, R = GetHum()
+        if not H or not R or H.Health <= 0 then if Cb then Cb() end return end
+        R.CFrame = CFrame.new(Dest + Vector3.new(0,2,0))
+        R.AssemblyLinearVelocity = Vector3.zero R.AssemblyAngularVelocity = Vector3.zero
+        Lock(Dest) if Cb then Cb() end
+    end
+    local function SearchFirst()
+        FirstList = {}
+        if not Container then return end
+        for _, s in ipairs(Container:GetChildren()) do
+            if string.find(s.Name, "FirstAreaEgg") then
+                local N = string.match(s.Name, "Slot_(%d+)")
+                if N then table.insert(FirstList, {Slot = s, Uid = s.Name, Key = "Forest:Slot_" .. N}) end
+            end
+        end
+    end
+    local function FindClosest()
+        local _, R = GetHum() if not R then return end
+        local B, BD = nil, 99999
+        for _, E in ipairs(FirstList) do
+            local P = GetPos(E.Slot)
+            if P then
+                local D = (P - R.Position).Magnitude
+                if D < BD then BD = D B = E end
+            end
+        end
+        if B then FirstUid = B.Uid FirstKey = B.Key end
+        return B
+    end
+    local function AutoStop() Running = false Cleanup() end
+    local function StartProc()
+        Running = true
+        CollectDone, TgtDone = false, false
+        SavedTarget = nil
+        local Mode = "spawn"
+        if Container and Container:FindFirstChild(TARGET_UID) then Mode = "spawn"
+        elseif workspace:FindFirstChild(TARGET_UID) then
+            Mode = "workspace"
+            SavedTarget = GetPos(workspace:FindFirstChild(TARGET_UID))
+        else AutoStop() return end
+        SearchFirst()
+        if #FirstList == 0 then AutoStop() return end
+        local C = FindClosest() if not C then AutoStop() return end
+        local P = GetPos(C.Slot) if not P then AutoStop() return end
+        FlyTP(P, SPEED, true, false, function()
+            task.spawn(function()
+                local tries = 0
+                while Running and not CollectDone and tries < 50 do
+                    task.wait(0.2) tries = tries + 1
+                    if CollectEvent and FirstKey and FirstUid then
+                        pcall(function() CollectEvent:InvokeServer({FirstAreaSlotKey = FirstKey, Uid = FirstUid}) end)
+                    end
+                    if FirstUid and workspace:FindFirstChild(FirstUid) then CollectDone = true end
+                end
+                task.wait(2)
+                if not Running then return end
+                local TP = nil
+                if Mode == "spawn" then
+                    local E = Container and Container:FindFirstChild(TARGET_UID)
+                    if E then TP = GetPos(E) end
+                else TP = SavedTarget end
+                if not TP then AutoStop() return end
+                local Fn = (METHOD == "InstantTeleport") and InstantTP or function(P2, Cb) FlyTP(P2, SPEED, true, false, Cb) end
+                Fn(TP, function()
+                    task.spawn(function()
+                        local t2 = 0
+                        while Running and not TgtDone and t2 < 50 do
+                            task.wait(0.2) t2 = t2 + 1
+                            if CollectEvent then pcall(function() CollectEvent:InvokeServer({Uid = TARGET_UID}) end) end
+                            if Mode == "spawn" and workspace:FindFirstChild(TARGET_UID) then TgtDone = true
+                            elseif Mode == "workspace" and SavedTarget then
+                                local W = workspace:FindFirstChild(TARGET_UID)
+                                if W then
+                                    local NP = GetPos(W)
+                                    if NP and (NP - SavedTarget).Magnitude >= 1 then TgtDone = true end
+                                end
+                            end
+                        end
+                        if not Running then return end
+                        FlyTP(SAFE_ZONE, SPEED, false, true, function() AutoStop() end)
+                    end)
+                end)
+            end)
+        end)
+    end
+    _G.YOKUDO_TeleportSystem = {
+        Enable = function()
+            if Running then return end
+            if not CollectEvent or not TARGET_UID then return end
+            Running = false task.wait(0.05) StartProc()
+        end,
+        Disable = function() Running = false Cleanup() ResetCharacterState() end,
+        SetTargetId = function(id) TARGET_UID = id end,
+        SetSpeed = function(v) SPEED = math.clamp(v,50,1100) end,
+        SetMethod = function(m) METHOD = (m == "InstantTeleport") and "InstantTeleport" or "TeleportFly" end,
+        GetMethod = function() return METHOD end,
+        GetSpeed = function() return SPEED end,
+        IsEnabled = function() return Running end,
+    }
+end)
+
+SafeCall("AutoFarm", function()
+    local Enabled, Selected, List = false, nil, {}
+    local function GetDataPaths()
+        local Data = ReplicatedStorage:FindFirstChild("Data")
+        local Assets = Data and Data:FindFirstChild("Assets")
+        local Configs = Assets and Assets:FindFirstChild("Configs")
+        local EggModels = nil
+        local RAS = ReplicatedStorage:FindFirstChild("Assets")
+        if RAS then
+            local M = RAS:FindFirstChild("Models")
+            if M then EggModels = M:FindFirstChild("Eggs") end
+        end
+        if not EggModels and Assets then
+            local M = Assets:FindFirstChild("Models")
+            if M then EggModels = M:FindFirstChild("Eggs") end
+        end
+        return Data, Assets, Configs, EggModels
+    end
+    local MeshMap = {}
+    local function BuildMeshMap()
+        MeshMap = {}
+        local _, _, Configs, EggModels = GetDataPaths()
+        if not Configs or not EggModels then return end
+        for _, C in ipairs(Configs:GetChildren()) do
+            local ok, M = pcall(function() return require(C) end)
+            if ok and M and M.Egg then
+                local MN = M.Egg.ModelName or C.Name
+                local Template = EggModels:FindFirstChild(MN)
+                if Template then
+                    for _, d in ipairs(Template:GetDescendants()) do
+                        if d:IsA("MeshPart") and d.MeshId ~= "" then MeshMap[d.MeshId] = C.Name end
+                        if d:IsA("SpecialMesh") and d.MeshId ~= "" then MeshMap[d.MeshId] = C.Name end
+                    end
+                end
+            end
+        end
+    end
+    BuildMeshMap()
+    local function GetData(Cat)
+        local _, _, Configs = GetDataPaths()
+        if not Configs then return nil end
+        local C = Configs:FindFirstChild(Cat) if not C then return nil end
+        local D = {Name = Cat, DisplayName = Cat, EarningRate = 0, Icon = nil}
+        local ok, M = pcall(function() return require(C) end)
+        if ok and M then
+            D.DisplayName = M.DisplayName or Cat
+            D.EarningRate = M.EarningRate or 0
+            D.Icon = M.Icon
+        end
+        return D
+    end
+    local function FM(A)
+        if type(A) ~= "number" then return tostring(A) end
+        if A >= 1e12 then return string.format("%.2fT", A/1e12)
+        elseif A >= 1e9 then return string.format("%.2fB", A/1e9)
+        elseif A >= 1e6 then return string.format("%.2fM", A/1e6)
+        elseif A >= 1e3 then return string.format("%.2fK", A/1e3)
+        else return tostring(math.floor(A)) end
+    end
+    local function MatchCategory(model)
+        if not next(MeshMap) then BuildMeshMap() end
+        for _, d in ipairs(model:GetDescendants()) do
+            if d:IsA("MeshPart") and d.MeshId ~= "" and MeshMap[d.MeshId] then return MeshMap[d.MeshId] end
+            if d:IsA("SpecialMesh") and d.MeshId ~= "" and MeshMap[d.MeshId] then return MeshMap[d.MeshId] end
+        end
+        return nil
+    end
+    local function Scan()
+        List = {}
+        local Container = workspace:FindFirstChild("AreaEggSlotsClient")
+        if not Container then return List end
+        for _, c in ipairs(Container:GetChildren()) do
+            if c:IsA("Model") then
+                local cat = MatchCategory(c)
+                if cat then
+                    local D = GetData(cat)
+                    table.insert(List, {
+                        Id = c.Name, Category = cat,
+                        DisplayName = (D and D.DisplayName) or cat,
+                        Icon = D and D.Icon or nil,
+                        EarningRate = (D and D.EarningRate) or 0,
+                        Model = c,
+                    })
+                end
+            end
+        end
+        table.sort(List, function(a,b) return a.EarningRate > b.EarningRate end)
+        print("[BY THZIN] Scan → Mostrados: " .. #List)
+        return List
+    end
+    _G.YOKUDO_AutoFarm = {
+        Enable = function() Enabled = true end,
+        Disable = function() Enabled = false end,
+        IsEnabled = function() return Enabled end,
+        ScanEggs = Scan,
+        GetEggList = function() return List end,
+        SelectEgg = function(E) Selected = E end,
+        StartTeleport = function()
+            if not Selected then warn("[BY THZIN] Nenhum ovo selecionado") return end
+            local M = _G.YOKUDO_SelectedMethod or "TeleportFly"
+            local S = _G.YOKUDO_TeleportSpeed or 500
+            if _G.YOKUDO_TeleportSystem then
+                _G.YOKUDO_TeleportSystem.SetMethod(M)
+                _G.YOKUDO_TeleportSystem.SetSpeed(S)
+                _G.YOKUDO_TeleportSystem.SetTargetId(Selected.Id)
+                _G.YOKUDO_TeleportSystem.Enable()
+            end
+        end,
+        StopTeleport = function()
+            if _G.YOKUDO_TeleportSystem then _G.YOKUDO_TeleportSystem.Disable() end
+        end,
+        GetSelectedEgg = function() return Selected end,
+        FormatMoney = FM,
+    }
+end)
+
+SafeCall("AutoAttack", function()
+    local Backpack = Player:WaitForChild("Backpack", 10)
+    local RANGE, INTERVAL = 60, 0.01
+    local AutoEq, AutoHit, EqConn, HitConn, LastFire, Seq = false, false, nil, nil, 0, 0
+    local function GetHum()
+        local C = Player.Character if not C then return nil, nil end
+        return C:FindFirstChildOfClass("Humanoid"), C:FindFirstChild("HumanoidRootPart")
+    end
+    local function GetRemote()
+        local ok, R = pcall(function() return ReplicatedStorage.Packages.Networking["RE/BatSwing/Trigger"] end)
+        if ok then return R end
+    end
+    local function FindBat()
+        if Backpack then
+            for _, t in ipairs(Backpack:GetChildren()) do
+                if t:IsA("Tool") and (t.ToolTip == "Bat" or t.Name:find("Bat")) then return t end
+            end
+        end
+        local C = Player.Character
+        if C then
+            for _, t in ipairs(C:GetChildren()) do
+                if t:IsA("Tool") and (t.ToolTip == "Bat" or t.Name:find("Bat")) then return t end
+            end
+        end
+    end
+    local function EquipBat()
+        local B = FindBat() if not B then return end
+        if B.Parent == Backpack then
+            local H = GetHum() if H then H:EquipTool(B) end
+        end
+    end
+    local function FindClose()
+        local _, R = GetHum() if not R then return nil end
+        local Best, BD = nil, RANGE
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= Player then
+                local C = p.Character
+                if C then
+                    local H = C:FindFirstChildOfClass("Humanoid")
+                    local R2 = C:FindFirstChild("HumanoidRootPart")
+                    if H and R2 and H.Health > 0 then
+                        local D = (R2.Position - R.Position).Magnitude
+                        if D < BD then BD = D Best = p end
+                    end
+                end
+            end
+        end
+        return Best
+    end
+    local function Fire()
+        local T2 = FindClose() if not T2 then return end
+        local Rem = GetRemote() if not Rem then return end
+        Seq = Seq + 1
+        local ID = tostring(Player.UserId)..":"..tostring(Seq)..":"..tostring(math.floor(workspace:GetServerTimeNow()*1000))
+        pcall(function() Rem:FireServer(T2, ID) end)
+    end
+    _G.YOKUDO_AutoAttack = {
+        ToggleAutoEquip = function()
+            AutoEq = not AutoEq
+            if AutoEq then
+                EquipBat()
+                if EqConn then EqConn:Disconnect() end
+                EqConn = RunService.Heartbeat:Connect(function()
+                    if not AutoEq then return end
+                    local B = FindBat()
+                    if B and B.Parent == Backpack then EquipBat() end
+                end)
+            else
+                if EqConn then EqConn:Disconnect() EqConn = nil end
+            end
+        end,
+        EnableAutoEquip = function() if not AutoEq then _G.YOKUDO_AutoAttack.ToggleAutoEquip() end end,
+        DisableAutoEquip = function() if AutoEq then _G.YOKUDO_AutoAttack.ToggleAutoEquip() end end,
+        IsAutoEquipEnabled = function() return AutoEq end,
+        ToggleAutoHit = function()
+            AutoHit = not AutoHit
+            if AutoHit then
+                if HitConn then HitConn:Disconnect() end
+                HitConn = RunService.Heartbeat:Connect(function()
+                    if not AutoHit then return end
+                    local n = tick()
+                    if n - LastFire < INTERVAL then return end
+                    LastFire = n Fire()
+                end)
+            else
+                if HitConn then HitConn:Disconnect() HitConn = nil end
+            end
+        end,
+        EnableAutoHit = function() if not AutoHit then _G.YOKUDO_AutoAttack.ToggleAutoHit() end end,
+        DisableAutoHit = function() if AutoHit then _G.YOKUDO_AutoAttack.ToggleAutoHit() end end,
+        IsAutoHitEnabled = function() return AutoHit end,
+        FindBatTool = FindBat,
+        GetBatSwingRemote = GetRemote,
+    }
+end)
+
+SafeCall("AFKSystem", function()
+    local SPEED = 400
+    local SAFE = Vector3.new(533,70,-366)
+    local Enabled, Plot, TMd, TMPos = false, nil, nil, nil
+    local FlyC, BV, BG, Thread = nil, nil, nil, nil
+    local function GetHum()
+        local C = Player.Character if not C then return nil, nil end
+        return C:FindFirstChildOfClass("Humanoid"), C:FindFirstChild("HumanoidRootPart")
+    end
+    local function Cleanup()
+        if FlyC then FlyC:Disconnect() FlyC = nil end
+        if BV then pcall(function() BV:Destroy() end) BV = nil end
+        if BG then pcall(function() BG:Destroy() end) BG = nil end
+        local H, R = GetHum()
+        if R then
+            for _, c in ipairs(R:GetChildren()) do
+                if c.Name == "YokudoBV" or c.Name == "YokudoBG" then c:Destroy() end
+            end
+        end
+        if H then pcall(function() H.PlatformStand = false H.Sit = false end) end
+    end
+    local function FindPlot()
+        local P = workspace:FindFirstChild("Plots") if not P then return end
+        for _, plot in ipairs(P:GetChildren()) do
+            if plot:IsA("Model") then
+                local S = plot:FindFirstChild("PlotSign")
+                if S then
+                    local PS = S:FindFirstChild("PlayerPlotSign")
+                    if PS then
+                        local F = PS:FindFirstChild("Frame")
+                        if F then
+                            local N = F:FindFirstChild("PlayerName")
+                            if N and N:IsA("TextLabel") and (N.Text == Player.Name or N.Text == Player.DisplayName) then
+                                return plot, plot:FindFirstChild("TreadmillBottom")
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    local function FlyTP(Dest, Cb)
+        Cleanup()
+        local H, R = GetHum() if not H or not R then if Cb then Cb() end return end
+        H.PlatformStand = true
+        BV = Instance.new("BodyVelocity") BV.Name = "YokudoBV"
+        BV.MaxForce = Vector3.new(math.huge,math.huge,math.huge)
+        BV.P = 1250 BV.Velocity = Vector3.zero BV.Parent = R
+        BG = Instance.new("BodyGyro") BG.Name = "YokudoBG"
+        BG.MaxTorque = Vector3.new(math.huge,math.huge,math.huge)
+        BG.P = 3000 BG.D = 500 BG.CFrame = R.CFrame BG.Parent = R
+        local Start = tick()
+        FlyC = RunService.Heartbeat:Connect(function()
+            if not Enabled then Cleanup() return end
+            local H2, R2 = GetHum() if not H2 or not R2 or H2.Health <= 0 then Cleanup() return end
+            if not BV or not BG then Cleanup() return end
+            local D = Dest - R2.Position
+            if D.Magnitude <= 2 then
+                Cleanup() R2.CFrame = CFrame.new(Dest)
+                R2.AssemblyLinearVelocity = Vector3.zero R2.AssemblyAngularVelocity = Vector3.zero
+                if Cb then Cb() end return
+            end
+            if tick()-Start > 15 then Cleanup() if Cb then Cb() end return end
+            BV.Velocity = D.Unit * SPEED
+            BG.CFrame = CFrame.new(R2.Position, Dest)
+        end)
+    end
+    _G.YOKUDO_AFKSystem = {
+        Enable = function()
+            if Enabled then return end
+            Enabled = true
+            Plot, TMd = FindPlot()
+            if not TMd then Enabled = false return end
+            TMPos = TMd.Position
+            FlyTP(TMPos, function()
+                Thread = task.spawn(function()
+                    while Enabled do
+                        task.wait(4)
+                        if not Enabled then break end
+                        local _, R = GetHum()
+                        if R and TMPos then
+                            local D = math.floor((R.Position - TMPos).Magnitude)
+                            if D > 5 then FlyTP(TMPos) end
+                        end
+                    end
+                end)
+            end)
+        end,
+        Disable = function()
+            if not Enabled then return end
+            Enabled = false
+            if Thread then pcall(function() task.cancel(Thread) end) Thread = nil end
+            Cleanup()
+            ResetCharacterState()
+        end,
+        IsEnabled = function() return Enabled end,
+        FlyTP = FlyTP,
+        FindMyPlotAndTreadmill = FindPlot,
+        GetMyTreadmillPos = function() return TMPos end,
+    }
+end)
+
+SafeCall("AttackDrone", function()
+    local Enabled, Conn = false, nil
+    _G.YOKUDO_AttackDrone = {
+        Start = function()
+            if Enabled then return end
+            Enabled = true
+            if _G.YOKUDO_AutoAttack then pcall(function() _G.YOKUDO_AutoAttack.EnableAutoEquip() end) end
+            if _G.YOKUDO_AutoAttack then pcall(function() _G.YOKUDO_AutoAttack.EnableAutoHit() end) end
+        end,
+        Stop = function()
+            if not Enabled then return end
+            Enabled = false
+            if Conn then Conn:Disconnect() Conn = nil end
+            if _G.YOKUDO_AutoAttack then
+                pcall(function() _G.YOKUDO_AutoAttack.DisableAutoEquip() end)
+                pcall(function() _G.YOKUDO_AutoAttack.DisableAutoHit() end)
+            end
+            ResetCharacterState()
+        end,
+        Disable = function()
+            Enabled = false
+            if Conn then Conn:Disconnect() Conn = nil end
+            ResetCharacterState()
+        end,
+        IsEnabled = function() return Enabled end,
+        Toggle = function() if Enabled then _G.YOKUDO_AttackDrone.Stop() else _G.YOKUDO_AttackDrone.Start() end end,
+    }
+end)
+
+SafeCall("ManagerDrone", function()
+    _G.YOKUDO_ManagerDrone = {
+        Enable = function() if _G.YOKUDO_AttackDrone then _G.YOKUDO_AttackDrone.Start() end end,
+        Disable = function() if _G.YOKUDO_AttackDrone then _G.YOKUDO_AttackDrone.Stop() end end,
+        IsEnabled = function() return _G.YOKUDO_AttackDrone and _G.YOKUDO_AttackDrone.IsEnabled() end,
+    }
+end)
+
+SafeCall("ManualFastClick", function()
+    local Enabled, PC, HC = false, nil, nil
+    local function Apply(p) if p then pcall(function() p.HoldDuration = 0 end) end end
+    local function Scan()
+        for _, d in ipairs(workspace:GetDescendants()) do
+            if d:IsA("ProximityPrompt") then Apply(d) end
+        end
+    end
+    _G.YOKUDO_ManualFastClick = {
+        Enable = function()
+            if Enabled then return end
+            Enabled = true Scan()
+            if PC then PC:Disconnect() end
+            PC = ProximityPromptService.PromptShown:Connect(function(p) if Enabled then Apply(p) end end)
+            if HC then HC:Disconnect() end
+            local C = 0
+            HC = RunService.Heartbeat:Connect(function()
+                if not Enabled then return end
+                C = C + 1
+                if C >= 30 then C = 0 Scan() end
+            end)
+        end,
+        Disable = function()
+            Enabled = false
+            if PC then PC:Disconnect() PC = nil end
+            if HC then HC:Disconnect() HC = nil end
+        end,
+        Toggle = function() if Enabled then _G.YOKUDO_ManualFastClick.Disable() else _G.YOKUDO_ManualFastClick.Enable() end end,
+        IsEnabled = function() return Enabled end,
+    }
+end)
+
+SafeCall("ConfigSystem", function()
+    local FOLDER = "YOKUDO-SAE"
+    local FILE = FOLDER .. "/yokudo.json"
+    local DEF = {SelectedMethod = "TeleportFly", TeleportSpeed = 300}
+    local function Ensure()
+        pcall(function() if not isfolder(FOLDER) then makefolder(FOLDER) end end)
+    end
+    local function Load()
+        Ensure()
+        local C = table.clone(DEF)
+        if not pcall(function() return isfile(FILE) end) then return C end
+        local ok, raw = pcall(function() return readfile(FILE) end)
+        if not ok or not raw or raw == "" then return C end
+        local ok2, D = pcall(function() return HttpService:JSONDecode(raw) end)
+        if not ok2 or type(D) ~= "table" then return C end
+        if type(D.SelectedMethod) == "string" and (D.SelectedMethod == "TeleportFly" or D.SelectedMethod == "InstantTeleport") then
+            C.SelectedMethod = D.SelectedMethod
+        end
+        if type(D.TeleportSpeed) == "number" then
+            C.TeleportSpeed = math.clamp(D.TeleportSpeed, 50, 1100)
+        end
+        return C
+    end
+    local function Save(C)
+        Ensure()
+        local d = {SelectedMethod = C.SelectedMethod or DEF.SelectedMethod, TeleportSpeed = C.TeleportSpeed or DEF.TeleportSpeed}
+        local ok, e = pcall(function() return HttpService:JSONEncode(d) end)
+        if not ok then return false end
+        pcall(function() writefile(FILE, e) end)
+        return true
+    end
+    local function Apply(C)
+        _G.YOKUDO_SelectedMethod = C.SelectedMethod
+        _G.YOKUDO_TeleportSpeed = C.TeleportSpeed
+    end
+    Apply(Load())
+    _G.YOKUDO_ConfigSystem = {
+        Folder = FOLDER, File = FILE, Default = DEF,
+        Load = function() local C = Load() Apply(C) return C end,
+        Save = function() return Save({SelectedMethod = _G.YOKUDO_SelectedMethod or DEF.SelectedMethod, TeleportSpeed = _G.YOKUDO_TeleportSpeed or DEF.TeleportSpeed}) end,
+        Get = function() return {SelectedMethod = _G.YOKUDO_SelectedMethod or DEF.SelectedMethod, TeleportSpeed = _G.YOKUDO_TeleportSpeed or DEF.TeleportSpeed} end,
+        Reset = function() Apply(DEF) return Save(DEF) end,
+    }
+end)
+
+--==================================================
+-- TABS
+--==================================================
+SafeCall("Tab_Info", function()
+    local _, Page = TM:RegisterTab("Info", 1, "INFO")
+    SectionTitle(Page, "BY THZIN", 1)
+    local Card = CreateCard(Page, 2, 100)
+    local L1 = Instance.new("TextLabel")
+    L1.Size = UDim2.new(1,-32,0,26) L1.Position = UDim2.new(0,16,0,14)
+    L1.BackgroundTransparency = 1 L1.Text = "BY THZIN"
+    L1.TextColor3 = T.Text L1.TextSize = 18
+    L1.TextXAlignment = Enum.TextXAlignment.Left
+    L1.Font = Enum.Font.GothamBold L1.ZIndex = 9 L1.Parent = Card
+    local L2 = Instance.new("TextLabel")
+    L2.Size = UDim2.new(1,-32,0,20) L2.Position = UDim2.new(0,16,0,42)
+    L2.BackgroundTransparency = 1 L2.Text = "Steal An Egg • Version 5.0"
+    L2.TextColor3 = T.SubText L2.TextSize = 12
+    L2.TextXAlignment = Enum.TextXAlignment.Left
+    L2.Font = Enum.Font.Gotham L2.ZIndex = 9 L2.Parent = Card
+    local L3 = Instance.new("TextLabel")
+    L3.Size = UDim2.new(1,-32,0,18) L3.Position = UDim2.new(0,16,0,66)
+    L3.BackgroundTransparency = 1 L3.Text = "My Instagram: @thiagots5"
+    L3.TextColor3 = T.Primary L3.TextSize = 11
+    L3.TextXAlignment = Enum.TextXAlignment.Left
+    L3.Font = Enum.Font.GothamMedium L3.ZIndex = 9 L3.Parent = Card
+end)
+
+SafeCall("Tab_Combat", function()
+    local _, Page = TM:RegisterTab("Combat", 2, "COMBAT")
+    SectionTitle(Page, "Combat", 1)
+    CreateToggleCard(Page, 2, "Auto Equip Bat", "Equipa o bastão automaticamente",
+        function() if _G.YOKUDO_AutoAttack then _G.YOKUDO_AutoAttack.EnableAutoEquip() end end,
+        function() if _G.YOKUDO_AutoAttack then _G.YOKUDO_AutoAttack.DisableAutoEquip() end end)
+    CreateToggleCard(Page, 3, "Auto Hit Player", "Range: 60 studs",
+        function() if _G.YOKUDO_AutoAttack then _G.YOKUDO_AutoAttack.EnableAutoHit() end end,
+        function() if _G.YOKUDO_AutoAttack then _G.YOKUDO_AutoAttack.DisableAutoHit() end end)
+end)
+
+SafeCall("Tab_AutoFarming", function()
+    local _, Page = TM:RegisterTab("Auto Farming", 3, "AUTO_FARMING")
+    SectionTitle(Page, "Auto Farming", 1)
+
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Size = UDim2.new(1,0,0,18)
+    StatusLabel.BackgroundTransparency = 1
+    StatusLabel.Text = "Clique em ↻ REFRESH pra escanear"
+    StatusLabel.TextColor3 = T.SubText
+    StatusLabel.TextSize = 11
+    StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    StatusLabel.Font = Enum.Font.GothamMedium
+    StatusLabel.LayoutOrder = 2
+    StatusLabel.Parent = Page
+
+    local InfoLabel = Instance.new("TextLabel")
+    InfoLabel.Size = UDim2.new(1,0,0,26)
+    InfoLabel.BackgroundColor3 = T.SurfaceHi
+    InfoLabel.BorderSizePixel = 0
+    InfoLabel.Text = "  🎯 Nenhum ovo selecionado"
+    InfoLabel.TextColor3 = T.SubText
+    InfoLabel.TextSize = 12
+    InfoLabel.TextXAlignment = Enum.TextXAlignment.Left
+    InfoLabel.Font = Enum.Font.GothamBold
+    InfoLabel.LayoutOrder = 3
+    InfoLabel.Parent = Page
+    Instance.new("UICorner", InfoLabel).CornerRadius = UDim.new(0,8)
+
+    local BtnRow = Instance.new("Frame")
+    BtnRow.Size = UDim2.new(1,0,0,42)
+    BtnRow.BackgroundColor3 = T.Surface
+    BtnRow.BorderSizePixel = 0
+    BtnRow.LayoutOrder = 4
+    BtnRow.Parent = Page
+    Instance.new("UICorner", BtnRow).CornerRadius = UDim.new(0,10)
+    local bs = Instance.new("UIStroke", BtnRow)
+    bs.Color = T.Divider bs.Thickness = 1 bs.Transparency = 0.6
+
+    local RowLayout = Instance.new("UIListLayout", BtnRow)
+    RowLayout.FillDirection = Enum.FillDirection.Horizontal
+    RowLayout.Padding = UDim.new(0,6)
+    RowLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    RowLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+
+    local function MakeBtn(text, bg, fg)
+        local B = Instance.new("TextButton")
+        B.Size = UDim2.new(0,0,0,30)
+        B.BackgroundColor3 = bg
+        B.BorderSizePixel = 0
+        B.Text = text
+        B.TextColor3 = fg or T.Background
+        B.TextSize = 11
+        B.Font = Enum.Font.GothamBold
+        B.AutoButtonColor = false
+        B.Parent = BtnRow
+        Instance.new("UICorner", B).CornerRadius = UDim.new(0,6)
+        AddRipple(B, fg or T.Background)
+        return B
+    end
+
+    local RefreshBtn = MakeBtn("↻ REFRESH", T.SurfaceHi2, T.Text)
+    local StartBtn   = MakeBtn("▶ START",   T.Primary,    T.Background)
+    local StopBtn    = MakeBtn("■ STOP",    T.Danger,     Color3.fromRGB(255,255,255))
+
+    local function LayoutBtns()
+        local total = BtnRow.AbsoluteSize.X
+        local each = math.floor((total - 24) / 3)
+        if each > 10 then
+            RefreshBtn.Size = UDim2.new(0, each, 0, 30)
+            StartBtn.Size   = UDim2.new(0, each, 0, 30)
+            StopBtn.Size    = UDim2.new(0, each, 0, 30)
+        end
+    end
+    task.spawn(function() task.wait(0.15) LayoutBtns() end)
+    BtnRow:GetPropertyChangedSignal("AbsoluteSize"):Connect(LayoutBtns)
+
+    local Scroll = Instance.new("ScrollingFrame")
+    Scroll.Size = UDim2.new(1,0,0,260)
+    Scroll.BackgroundColor3 = T.Surface
+    Scroll.BorderSizePixel = 0
+    Scroll.CanvasSize = UDim2.new(0,0,0,0)
+    Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    Scroll.ScrollingDirection = Enum.ScrollingDirection.Y
+    Scroll.ScrollBarThickness = 6
+    Scroll.ScrollBarImageColor3 = T.Primary
+    Scroll.ScrollBarImageTransparency = 0.3
+    Scroll.LayoutOrder = 5
+    Scroll.Parent = Page
+    Instance.new("UICorner", Scroll).CornerRadius = UDim.new(0,10)
+    local ss = Instance.new("UIStroke", Scroll)
+    ss.Color = T.Divider ss.Thickness = 1 ss.Transparency = 0.5
+
+    local ScrollPad = Instance.new("UIPadding", Scroll)
+    ScrollPad.PaddingTop = UDim.new(0,8)
+    ScrollPad.PaddingBottom = UDim.new(0,8)
+    ScrollPad.PaddingLeft = UDim.new(0,8)
+    ScrollPad.PaddingRight = UDim.new(0,8)
+
+    local LL = Instance.new("UIListLayout", Scroll)
+    LL.Padding = UDim.new(0,6)
+    LL.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local scanCount = 0
+
+    local function Refresh()
+        if not _G.YOKUDO_AutoFarm then
+            StatusLabel.Text = "❌ AutoFarm não carregou"
+            StatusLabel.TextColor3 = T.Danger
+            return
+        end
+        for _, c in ipairs(Scroll:GetChildren()) do
+            if c:IsA("Frame") then c:Destroy() end
+        end
+        local ok, Eggs = pcall(function() return _G.YOKUDO_AutoFarm.ScanEggs() end)
+        if not ok then
+            StatusLabel.Text = "❌ Erro no scan: " .. tostring(Eggs)
+            StatusLabel.TextColor3 = T.Danger
+            return
+        end
+        if type(Eggs) ~= "table" then
+            StatusLabel.Text = "❌ Scan não retornou lista"
+            StatusLabel.TextColor3 = T.Danger
+            return
+        end
+        scanCount = scanCount + 1
+        if #Eggs == 0 then
+            StatusLabel.Text = "❌ 0 ovos (vá até a área dos ovos)"
+            StatusLabel.TextColor3 = T.Danger
+            return
+        end
+        StatusLabel.Text = "✅ " .. #Eggs .. " ovo(s) encontrado(s) • Scan #" .. scanCount
+        StatusLabel.TextColor3 = T.Primary
+
+        for idx, E in ipairs(Eggs) do
+            local Entry = Instance.new("Frame")
+            Entry.Size = UDim2.new(1,-4,0,60)
+            Entry.BackgroundColor3 = T.SurfaceHi
+            Entry.BorderSizePixel = 0
+            Entry.LayoutOrder = idx
+            Entry.Parent = Scroll
+            Instance.new("UICorner", Entry).CornerRadius = UDim.new(0,8)
+
+            local II = Instance.new("ImageLabel")
+            II.Size = UDim2.new(0,44,0,44)
+            II.Position = UDim2.new(0,8,0.5,-22)
+            II.BackgroundColor3 = T.Background
+            II.BorderSizePixel = 0
+            II.Image = E.Icon or ""
+            II.Parent = Entry
+            Instance.new("UICorner", II).CornerRadius = UDim.new(0,8)
+
+            local NL = Instance.new("TextLabel")
+            NL.Size = UDim2.new(1,-180,0,20)
+            NL.Position = UDim2.new(0,60,0,8)
+            NL.BackgroundTransparency = 1
+            NL.Text = E.DisplayName or "?"
+            NL.TextColor3 = T.Text
+            NL.TextSize = 13
+            NL.TextXAlignment = Enum.TextXAlignment.Left
+            NL.Font = Enum.Font.GothamBold
+            NL.Parent = Entry
+
+            local RL = Instance.new("TextLabel")
+            RL.Size = UDim2.new(1,-180,0,18)
+            RL.Position = UDim2.new(0,60,0,30)
+            RL.BackgroundTransparency = 1
+            RL.Text = "$" .. _G.YOKUDO_AutoFarm.FormatMoney(E.EarningRate or 0) .. "/s"
+            RL.TextColor3 = T.Primary
+            RL.TextSize = 11
+            RL.TextXAlignment = Enum.TextXAlignment.Left
+            RL.Font = Enum.Font.GothamMedium
+            RL.Parent = Entry
+
+            local SB = Instance.new("TextButton")
+            SB.Size = UDim2.new(0,80,0,34)
+            SB.Position = UDim2.new(1,-88,0.5,-17)
+            SB.BackgroundColor3 = T.Primary
+            SB.BorderSizePixel = 0
+            SB.Text = "Select"
+            SB.TextColor3 = T.Background
+            SB.TextSize = 12
+            SB.Font = Enum.Font.GothamBold
+            SB.AutoButtonColor = false
+            SB.Parent = Entry
+            Instance.new("UICorner", SB).CornerRadius = UDim.new(0,8)
+            AddRipple(SB, T.Background)
+
+            SB.MouseButton1Click:Connect(function()
+                _G.YOKUDO_AutoFarm.SelectEgg(E)
+                InfoLabel.Text = "  🎯 " .. (E.DisplayName or "?") .. " — $" .. _G.YOKUDO_AutoFarm.FormatMoney(E.EarningRate or 0) .. "/s"
+                InfoLabel.TextColor3 = T.Primary
+                StatusLabel.Text = "🎯 Selecionado: " .. (E.DisplayName or "?")
+                StatusLabel.TextColor3 = T.Warning
+            end)
+        end
+
+        Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        task.wait()
+        Scroll.CanvasSize = UDim2.new(0, 0, 0, #Eggs * 66 + 16)
+    end
+
+    RefreshBtn.MouseButton1Click:Connect(function()
+        StatusLabel.Text = "🔍 Scaneando..."
+        StatusLabel.TextColor3 = T.SubText
+        Refresh()
+    end)
+    StartBtn.MouseButton1Click:Connect(function()
+        if _G.YOKUDO_AutoFarm then
+            local sel = _G.YOKUDO_AutoFarm.GetSelectedEgg()
+            if not sel then
+                StatusLabel.Text = "⚠ Selecione um ovo primeiro"
+                StatusLabel.TextColor3 = T.Warning
+                return
+            end
+            _G.YOKUDO_AutoFarm.StartTeleport()
+            StatusLabel.Text = "▶ Teleporte ATIVADO"
+            StatusLabel.TextColor3 = T.Primary
+        end
+    end)
+    StopBtn.MouseButton1Click:Connect(function()
+        if _G.YOKUDO_AutoFarm then
+            _G.YOKUDO_AutoFarm.StopTeleport()
+            StatusLabel.Text = "■ Teleporte PARADO"
+            StatusLabel.TextColor3 = T.Danger
+        end
+    end)
+
+    task.spawn(function()
+        for i = 1, 10 do
+            task.wait(2)
+            pcall(Refresh)
+        end
+        while task.wait(4) do pcall(Refresh) end
+    end)
+    task.wait(1)
+    pcall(Refresh)
+end)
+
+SafeCall("Tab_Event", function()
+    local _, Page = TM:RegisterTab("Event", 4, "EVENT")
+    SectionTitle(Page, "Event", 1)
+    CreateToggleCard(Page, 2, "Auto Attack Drone", "AFK Farm Drone",
+        function() if _G.YOKUDO_ManagerDrone then _G.YOKUDO_ManagerDrone.Enable() end end,
+        function() if _G.YOKUDO_ManagerDrone then _G.YOKUDO_ManagerDrone.Disable() end end)
+end)
+
+SafeCall("Tab_HopServer", function()
+    local PLACE_ID = 107778070777162
+    local _, Page = TM:RegisterTab("Hop Server", 5, "HOP_SERVER")
+    SectionTitle(Page, "Hop Server", 1)
+
+    local Card = CreateCard(Page, 2, 74)
+    local NL = Instance.new("TextLabel")
+    NL.Size = UDim2.new(1,-100,0,20) NL.Position = UDim2.new(0,16,0,12)
+    NL.BackgroundTransparency = 1 NL.Text = "Check Hop Server Low Player"
+    NL.TextColor3 = T.Text NL.TextSize = 13
+    NL.TextXAlignment = Enum.TextXAlignment.Left
+    NL.Font = Enum.Font.GothamBold NL.ZIndex = 9 NL.Parent = Card
+    local SL = Instance.new("TextLabel")
+    SL.Size = UDim2.new(1,-100,0,16) SL.Position = UDim2.new(0,16,0,36)
+    SL.BackgroundTransparency = 1 SL.Text = "Click to search servers"
+    SL.TextColor3 = T.SubText SL.TextSize = 10
+    SL.TextXAlignment = Enum.TextXAlignment.Left
+    SL.Font = Enum.Font.Gotham SL.ZIndex = 9 SL.Parent = Card
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(0,74,0,32) Btn.Position = UDim2.new(1,-90,0.5,-16)
+    Btn.BackgroundColor3 = T.Primary Btn.BorderSizePixel = 0
+    Btn.Text = "Click" Btn.TextColor3 = T.Background
+    Btn.TextSize = 12 Btn.Font = Enum.Font.GothamBold
+    Btn.AutoButtonColor = false Btn.ZIndex = 10 Btn.Parent = Card
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0,8)
+    AddRipple(Btn, T.Background)
+
+    local SS = Instance.new("ScrollingFrame")
+    SS.Size = UDim2.new(1,0,0,240) SS.BackgroundTransparency = 1
+    SS.BorderSizePixel = 0 SS.CanvasSize = UDim2.new(0,0,0,0)
+    SS.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    SS.ScrollingDirection = Enum.ScrollingDirection.Y
+    SS.ScrollBarThickness = 4 SS.ScrollBarImageColor3 = T.Divider
+    SS.LayoutOrder = 3 SS.Parent = Page
+    local LL = Instance.new("UIListLayout", SS)
+    LL.Padding = UDim.new(0,6) LL.SortOrder = Enum.SortOrder.LayoutOrder
+
+    Btn.MouseButton1Click:Connect(function()
+        SL.Text = "Searching..."
+        for _, c in ipairs(SS:GetChildren()) do if c:IsA("Frame") then c:Destroy() end end
+        task.spawn(function()
+            local all, seen, cursor, pages = {}, {}, "", 0
+            repeat
+                pages = pages + 1
+                local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100&cursor=%s", PLACE_ID, cursor)
+                local ok, resp = pcall(function() return HttpService:JSONDecode(game:HttpGet(url)) end)
+                if not ok or not resp or not resp.data then break end
+                for _, s in ipairs(resp.data) do
+                    if s.playing == 1 and s.id ~= game.JobId and s.maxPlayers > 1 and s.playing < s.maxPlayers then
+                        if not seen[s.id] then seen[s.id] = true table.insert(all, s) end
+                    end
+                end
+                cursor = resp.next_cursor or ""
+                task.wait(0.15)
+            until cursor == "" or pages >= 5
+            if #all == 0 then SL.Text = "No servers found." SL.TextColor3 = T.Danger return end
+            table.sort(all, function(a,b) return a.id < b.id end)
+            for i, s in ipairs(all) do
+                local E = Instance.new("Frame")
+                E.Size = UDim2.new(1,-6,0,52) E.BackgroundColor3 = T.Surface
+                E.BorderSizePixel = 0 E.LayoutOrder = i E.Parent = SS
+                Instance.new("UICorner", E).CornerRadius = UDim.new(0,10)
+                local JL = Instance.new("TextLabel")
+                JL.Size = UDim2.new(1,-100,1,0) JL.Position = UDim2.new(0,12,0,0)
+                JL.BackgroundTransparency = 1
+                JL.Text = tostring(i) .. ". " .. s.id
+                JL.TextColor3 = T.Text JL.TextSize = 11
+                JL.TextXAlignment = Enum.TextXAlignment.Left
+                JL.TextYAlignment = Enum.TextYAlignment.Center
+                JL.TextTruncate = Enum.TextTruncate.AtEnd JL.Parent = E
+                local JB = Instance.new("TextButton")
+                JB.Size = UDim2.new(0,64,0,30) JB.Position = UDim2.new(1,-76,0.5,-15)
+                JB.BackgroundColor3 = T.Primary JB.BorderSizePixel = 0
+                JB.Text = "Join" JB.TextColor3 = T.Background
+                JB.TextSize = 12 JB.Font = Enum.Font.GothamBold
+                JB.AutoButtonColor = false JB.Parent = E
+                Instance.new("UICorner", JB).CornerRadius = UDim.new(0,8)
+                JB.MouseButton1Click:Connect(function()
+                    pcall(function() TeleportService:TeleportToPlaceInstance(PLACE_ID, s.id, Player) end)
+                end)
+            end
+            SL.Text = "Found " .. #all .. " server(s)."
+            SL.TextColor3 = T.Primary
+        end)
+    end)
+end)
+
+SafeCall("Tab_Setting", function()
+    local _, Page = TM:RegisterTab("Setting", 6, "SETTING")
+    SectionTitle(Page, "Settings", 1)
+
+    local MethodCard = CreateCard(Page, 2, 64)
+    local ML = Instance.new("TextLabel")
+    ML.Size = UDim2.new(1,-120,0,22) ML.Position = UDim2.new(0,16,0,10)
+    ML.BackgroundTransparency = 1 ML.Text = "Teleport Method"
+    ML.TextColor3 = T.Text ML.TextSize = 13
+    ML.TextXAlignment = Enum.TextXAlignment.Left
+    ML.Font = Enum.Font.GothamBold ML.ZIndex = 9 ML.Parent = MethodCard
+    local MS = Instance.new("TextLabel")
+    MS.Size = UDim2.new(1,-120,0,16) MS.Position = UDim2.new(0,16,0,32)
+    MS.BackgroundTransparency = 1 MS.Text = "TeleportFly ou InstantTeleport"
+    MS.TextColor3 = T.SubText MS.TextSize = 10
+    MS.TextXAlignment = Enum.TextXAlignment.Left
+    MS.Font = Enum.Font.Gotham MS.ZIndex = 9 MS.Parent = MethodCard
+    local MethodBtn = Instance.new("TextButton")
+    MethodBtn.Size = UDim2.new(0,110,0,32) MethodBtn.Position = UDim2.new(1,-126,0.5,-16)
+    MethodBtn.BackgroundColor3 = T.SurfaceHi MethodBtn.BorderSizePixel = 0
+    MethodBtn.Text = _G.YOKUDO_SelectedMethod or "TeleportFly"
+    MethodBtn.TextColor3 = T.Text MethodBtn.TextSize = 11
+    MethodBtn.Font = Enum.Font.GothamBold MethodBtn.AutoButtonColor = false
+    MethodBtn.ZIndex = 10 MethodBtn.Parent = MethodCard
+    Instance.new("UICorner", MethodBtn).CornerRadius = UDim.new(0,8)
+    MethodBtn.MouseButton1Click:Connect(function()
+        local cur = _G.YOKUDO_SelectedMethod or "TeleportFly"
+        local new = (cur == "TeleportFly") and "InstantTeleport" or "TeleportFly"
+        _G.YOKUDO_SelectedMethod = new
+        MethodBtn.Text = new
+        if _G.YOKUDO_ConfigSystem then pcall(function() _G.YOKUDO_ConfigSystem.Save() end) end
+    end)
+
+    CreateTextboxCard(Page, 3, "Teleport Speed", "Range: 50 - 1100", _G.YOKUDO_TeleportSpeed or 500, function(v)
+        if v then
+            v = math.clamp(v, 50, 1100)
+            _G.YOKUDO_TeleportSpeed = v
+            if _G.YOKUDO_TeleportSystem then _G.YOKUDO_TeleportSystem.SetSpeed(v) end
+            if _G.YOKUDO_ConfigSystem then pcall(function() _G.YOKUDO_ConfigSystem.Save() end) end
+        end
+    end)
+
+    CreateTextboxCard(Page, 4, "Walk Speed", "Set value ao ativar", 50, function(v)
+        if v and _G.YOKUDO_WalkSpeed then _G.YOKUDO_WalkSpeed.SetValue(v) end
+    end)
+
+    CreateToggleCard(Page, 5, "Walk Speed Enable", "Ativa o walkspeed",
+        function()
+            if _G.YOKUDO_WalkSpeed then
+                _G.YOKUDO_WalkSpeed.SetValue(50)
+                _G.YOKUDO_WalkSpeed.Enable()
+            end
+        end,
+        function() if _G.YOKUDO_WalkSpeed then _G.YOKUDO_WalkSpeed.Disable() end end)
+
+    CreateToggleCard(Page, 6, "Anti Trap", "Remove traps da área",
+        function() if _G.YOKUDO_AntiTrap then _G.YOKUDO_AntiTrap.Enable() end end,
+        function() if _G.YOKUDO_AntiTrap then _G.YOKUDO_AntiTrap.Disable() end end)
+
+    CreateButtonCard(Page, 7, "God Mode", "Vida infinita", "ATIVAR",
+        function() if _G.YOKUDO_GodMode then _G.YOKUDO_GodMode.Enable() end end)
+
+    CreateToggleCard(Page, 8, "Manual Fast Click", "Prompt instantâneo",
+        function() if _G.YOKUDO_ManualFastClick then _G.YOKUDO_ManualFastClick.Enable() end end,
+        function() if _G.YOKUDO_ManualFastClick then _G.YOKUDO_ManualFastClick.Disable() end end)
+end)
+
+--==================================================
+-- BYPASS (só no respawn)
+--==================================================
+SafeCall("Bypass", function()
+    local function Run()
+        local C = Player.Character if not C then return end
+        local Old = C:FindFirstChildOfClass("Humanoid") if not Old then return end
+        local New = Old:Clone() New.Name = Old.Name
+        for _, Ch in ipairs(Old:GetChildren()) do
+            local Ex = New:FindFirstChild(Ch.Name)
+            if Ex then pcall(function() Ex:Destroy() end) end
+            pcall(function() Ch.Parent = New end)
+        end
+        Old:Destroy() task.wait() New.Parent = C task.wait()
+        if not New.Parent then return end
+        pcall(function()
+            New:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+            New.BreakJointsOnDeath = false New.RequiresNeck = false
+        end)
+        local Ani = New:FindFirstChildOfClass("Animator")
+        if not Ani then Ani = Instance.new("Animator") Ani.Parent = New end
+        pcall(function()
+            local PS = Player:FindFirstChild("PlayerScripts")
+            if not PS then return end
+            local PM = PS:FindFirstChild("PlayerModule")
+            if not PM then return end
+            local ok, M = pcall(function() return require(PM) end)
+            if not ok or not M then return end
+            local Ctrl pcall(function() Ctrl = M:GetControls() end)
+            if not Ctrl then return end
+            pcall(function() Ctrl:OnCharacterAdded(C) end)
+            task.wait()
+            pcall(function() Ctrl:UpdateActiveControlModuleEnabled() end)
+        end)
+        pcall(function()
+            local Cam = workspace.CurrentCamera
+            if Cam then Cam.CameraSubject = New end
+        end)
+        local Animate = C:FindFirstChild("Animate")
+        if Animate then
+            pcall(function() Animate.Disabled = true task.wait(0.05) Animate.Disabled = false end)
+        end
+    end
+    Player.CharacterAdded:Connect(function() task.wait(1.5) Run() end)
+end)
+
+--==================================================
+-- FINAL
+--==================================================
+task.wait(0.15)
+TM:SelectTabByName("Info")
+Log("🚀 BY THZIN Ready! Tabs: " .. #TM.Tabs)
