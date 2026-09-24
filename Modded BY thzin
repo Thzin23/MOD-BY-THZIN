@@ -2490,88 +2490,236 @@ SafeCall("Tab_HopServer", function()
     local _, Page = TM:RegisterTab("Hop Server", 5, "HOP_SERVER")
     SectionTitle(Page, "Hop Server", 1)
 
-    local Card = CreateCard(Page, 2, 74)
+    -- Card info
+    local Card = CreateCard(Page, 2, 80)
     local NL = Instance.new("TextLabel")
     NL.Size = UDim2.new(1,-100,0,20) NL.Position = UDim2.new(0,16,0,12)
-    NL.BackgroundTransparency = 1 NL.Text = "Check Hop Server Low Player"
+    NL.BackgroundTransparency = 1 NL.Text = "Servidores com poucos players"
     NL.TextColor3 = T.Text NL.TextSize = 13
     NL.TextXAlignment = Enum.TextXAlignment.Left
     NL.Font = Enum.Font.GothamBold NL.ZIndex = 9 NL.Parent = Card
+
     local SL = Instance.new("TextLabel")
-    SL.Size = UDim2.new(1,-100,0,16) SL.Position = UDim2.new(0,16,0,36)
-    SL.BackgroundTransparency = 1 SL.Text = "Click to search servers"
+    SL.Size = UDim2.new(1,-100,0,16) SL.Position = UDim2.new(0,16,0,32)
+    SL.BackgroundTransparency = 1 SL.Text = "Clique para buscar (ordena por menos players)"
     SL.TextColor3 = T.SubText SL.TextSize = 10
     SL.TextXAlignment = Enum.TextXAlignment.Left
     SL.Font = Enum.Font.Gotham SL.ZIndex = 9 SL.Parent = Card
+
+    local SC = Instance.new("TextLabel")
+    SC.Size = UDim2.new(1,-100,0,16) SC.Position = UDim2.new(0,16,0,52)
+    SC.BackgroundTransparency = 1 SC.Text = ""
+    SC.TextColor3 = T.Primary SC.TextSize = 10
+    SC.TextXAlignment = Enum.TextXAlignment.Left
+    SC.Font = Enum.Font.GothamMedium SC.ZIndex = 9 SC.Parent = Card
+
     local Btn = Instance.new("TextButton")
     Btn.Size = UDim2.new(0,74,0,32) Btn.Position = UDim2.new(1,-90,0.5,-16)
     Btn.BackgroundColor3 = T.Primary Btn.BorderSizePixel = 0
-    Btn.Text = "Click" Btn.TextColor3 = T.Background
+    Btn.Text = "Buscar" Btn.TextColor3 = T.Background
     Btn.TextSize = 12 Btn.Font = Enum.Font.GothamBold
     Btn.AutoButtonColor = false Btn.ZIndex = 10 Btn.Parent = Card
     Instance.new("UICorner", Btn).CornerRadius = UDim.new(0,8)
     AddRipple(Btn, T.Background)
 
+    -- Scroll
     local SS = Instance.new("ScrollingFrame")
-    SS.Size = UDim2.new(1,0,0,240) SS.BackgroundTransparency = 1
-    SS.BorderSizePixel = 0 SS.CanvasSize = UDim2.new(0,0,0,0)
+    SS.Size = UDim2.new(1,0,0,250)
+    SS.BackgroundColor3 = T.Surface
+    SS.BorderSizePixel = 0
+    SS.CanvasSize = UDim2.new(0,0,0,0)
     SS.AutomaticCanvasSize = Enum.AutomaticSize.Y
     SS.ScrollingDirection = Enum.ScrollingDirection.Y
-    SS.ScrollBarThickness = 4 SS.ScrollBarImageColor3 = T.Divider
-    SS.LayoutOrder = 3 SS.Parent = Page
-    local LL = Instance.new("UIListLayout", SS)
-    LL.Padding = UDim.new(0,6) LL.SortOrder = Enum.SortOrder.LayoutOrder
+    SS.ScrollBarThickness = 6
+    SS.ScrollBarImageColor3 = T.Primary
+    SS.LayoutOrder = 3
+    SS.Parent = Page
+    Instance.new("UICorner", SS).CornerRadius = UDim.new(0,10)
+    local ssS = Instance.new("UIStroke", SS)
+    ssS.Color = T.Divider ssS.Thickness = 1 ssS.Transparency = 0.5
 
-    Btn.MouseButton1Click:Connect(function()
-        SL.Text = "Searching..."
-        for _, c in ipairs(SS:GetChildren()) do if c:IsA("Frame") then c:Destroy() end end
-        task.spawn(function()
-            local all, seen, cursor, pages = {}, {}, "", 0
-            repeat
-                pages = pages + 1
-                local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100&cursor=%s", PLACE_ID, cursor)
-                local ok, resp = pcall(function() return HttpService:JSONDecode(game:HttpGet(url)) end)
-                if not ok or not resp or not resp.data then break end
-                for _, s in ipairs(resp.data) do
-                    if s.playing == 1 and s.id ~= game.JobId and s.maxPlayers > 1 and s.playing < s.maxPlayers then
-                        if not seen[s.id] then seen[s.id] = true table.insert(all, s) end
+    local SSPad = Instance.new("UIPadding", SS)
+    SSPad.PaddingTop = UDim.new(0,6)
+    SSPad.PaddingBottom = UDim.new(0,6)
+    SSPad.PaddingLeft = UDim.new(0,6)
+    SSPad.PaddingRight = UDim.new(0,6)
+
+    local LL = Instance.new("UIListLayout", SS)
+    LL.Padding = UDim.new(0,6)
+    LL.SortOrder = Enum.SortOrder.LayoutOrder
+
+    -- 🔧 Função que busca TODOS os servidores (não só os com 1 player)
+    local function FetchAllServers()
+        local all, seen, cursor, pages = {}, {}, "", 0
+        local maxPages = 3  -- 3 páginas = até 300 servers
+
+        repeat
+            pages = pages + 1
+            local url = string.format(
+                "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100&cursor=%s",
+                PLACE_ID, cursor
+            )
+            local ok, resp = pcall(function()
+                return HttpService:JSONDecode(game:HttpGet(url))
+            end)
+            if not ok or not resp or not resp.data then break end
+
+            for _, s in ipairs(resp.data) do
+                if s.id ~= game.JobId and s.maxPlayers > 1 then
+                    if not seen[s.id] then
+                        seen[s.id] = true
+                        table.insert(all, s)
                     end
                 end
-                cursor = resp.next_cursor or ""
-                task.wait(0.15)
-            until cursor == "" or pages >= 5
-            if #all == 0 then SL.Text = "No servers found." SL.TextColor3 = T.Danger return end
-            table.sort(all, function(a,b) return a.id < b.id end)
-            for i, s in ipairs(all) do
-                local E = Instance.new("Frame")
-                E.Size = UDim2.new(1,-6,0,52) E.BackgroundColor3 = T.Surface
-                E.BorderSizePixel = 0 E.LayoutOrder = i E.Parent = SS
-                Instance.new("UICorner", E).CornerRadius = UDim.new(0,10)
-                local JL = Instance.new("TextLabel")
-                JL.Size = UDim2.new(1,-100,1,0) JL.Position = UDim2.new(0,12,0,0)
-                JL.BackgroundTransparency = 1
-                JL.Text = tostring(i) .. ". " .. s.id
-                JL.TextColor3 = T.Text JL.TextSize = 11
-                JL.TextXAlignment = Enum.TextXAlignment.Left
-                JL.TextYAlignment = Enum.TextYAlignment.Center
-                JL.TextTruncate = Enum.TextTruncate.AtEnd JL.Parent = E
-                local JB = Instance.new("TextButton")
-                JB.Size = UDim2.new(0,64,0,30) JB.Position = UDim2.new(1,-76,0.5,-15)
-                JB.BackgroundColor3 = T.Primary JB.BorderSizePixel = 0
-                JB.Text = "Join" JB.TextColor3 = T.Background
-                JB.TextSize = 12 JB.Font = Enum.Font.GothamBold
-                JB.AutoButtonColor = false JB.Parent = E
-                Instance.new("UICorner", JB).CornerRadius = UDim.new(0,8)
-                JB.MouseButton1Click:Connect(function()
-                    pcall(function() TeleportService:TeleportToPlaceInstance(PLACE_ID, s.id, Player) end)
-                end)
             end
-            SL.Text = "Found " .. #all .. " server(s)."
-            SL.TextColor3 = T.Primary
+            cursor = resp.next_cursor or ""
+            task.wait(0.1)
+        until cursor == "" or pages >= maxPages
+
+        return all
+    end
+
+    -- 🔧 Cria cada entrada
+    local function CreateServerEntry(index, server)
+        local players = server.playing or 0
+        local maxP = server.maxPlayers or 0
+        local fps = server.fps or 0
+        local ping = server.ping or 0
+        local name = server.name or ""
+        local isVIP = server.vipServerId ~= nil and server.vipServerId ~= ""
+
+        local Entry = Instance.new("Frame")
+        Entry.Size = UDim2.new(1,-6,0,66)
+        Entry.BackgroundColor3 = T.SurfaceHi
+        Entry.BorderSizePixel = 0
+        Entry.LayoutOrder = index
+        Entry.Parent = SS
+        Instance.new("UICorner", Entry).CornerRadius = UDim.new(0,8)
+
+        -- Indicador de cor (verde = poucos players, amarelo = médio, vermelho = cheio)
+        local StatusDot = Instance.new("Frame")
+        StatusDot.Size = UDim2.new(0,6,0,36)
+        StatusDot.Position = UDim2.new(0,6,0.5,-18)
+        StatusDot.BorderSizePixel = 0
+        StatusDot.Parent = Entry
+        Instance.new("UICorner", StatusDot).CornerRadius = UDim.new(1,0)
+        if maxP > 0 then
+            local ratio = players / maxP
+            if ratio < 0.3 then StatusDot.BackgroundColor3 = T.Primary
+            elseif ratio < 0.7 then StatusDot.BackgroundColor3 = T.Warning
+            else StatusDot.BackgroundColor3 = T.Danger end
+        else
+            StatusDot.BackgroundColor3 = T.Divider
+        end
+
+        -- Nome do server / Job ID
+        local NameLabel = Instance.new("TextLabel")
+        NameLabel.Size = UDim2.new(1,-180,0,18)
+        NameLabel.Position = UDim2.new(0,18,0,6)
+        NameLabel.BackgroundTransparency = 1
+        if name ~= "" then
+            NameLabel.Text = "📛 " .. name
+        elseif isVIP then
+            NameLabel.Text = "👑 VIP Server"
+        else
+            NameLabel.Text = "🌐 Servidor Público #" .. index
+        end
+        NameLabel.TextColor3 = T.Text
+        NameLabel.TextSize = 12
+        NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        NameLabel.Font = Enum.Font.GothamBold
+        NameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+        NameLabel.Parent = Entry
+
+        -- Info: players, fps, ping
+        local InfoLabel = Instance.new("TextLabel")
+        InfoLabel.Size = UDim2.new(1,-180,0,14)
+        InfoLabel.Position = UDim2.new(0,18,0,24)
+        InfoLabel.BackgroundTransparency = 1
+        InfoLabel.Text = string.format("👥 %d/%d  •  🎯 %d FPS  •  📶 %dms", players, maxP, fps, ping)
+        InfoLabel.TextColor3 = T.Primary
+        InfoLabel.TextSize = 10
+        InfoLabel.TextXAlignment = Enum.TextXAlignment.Left
+        InfoLabel.Font = Enum.Font.GothamMedium
+        InfoLabel.Parent = Entry
+
+        -- Job ID pequeno (opcional, embaixo)
+        local JobLabel = Instance.new("TextLabel")
+        JobLabel.Size = UDim2.new(1,-180,0,12)
+        JobLabel.Position = UDim2.new(0,18,0,40)
+        JobLabel.BackgroundTransparency = 1
+        JobLabel.Text = "🆔 " .. string.sub(server.id, 1, 20) .. "..."
+        JobLabel.TextColor3 = T.SubText
+        JobLabel.TextSize = 9
+        JobLabel.TextXAlignment = Enum.TextXAlignment.Left
+        JobLabel.Font = Enum.Font.Gotham
+        JobLabel.Parent = Entry
+
+        -- Botão Join
+        local JB = Instance.new("TextButton")
+        JB.Size = UDim2.new(0,64,0,32)
+        JB.Position = UDim2.new(1,-72,0.5,-16)
+        JB.BackgroundColor3 = T.Primary
+        JB.BorderSizePixel = 0
+        JB.Text = "Join"
+        JB.TextColor3 = T.Background
+        JB.TextSize = 12
+        JB.Font = Enum.Font.GothamBold
+        JB.AutoButtonColor = false
+        JB.Parent = Entry
+        Instance.new("UICorner", JB).CornerRadius = UDim.new(0,8)
+        AddRipple(JB, T.Background)
+
+        JB.MouseButton1Click:Connect(function()
+            JB.Text = "..."
+            SC.Text = "Entrando no servidor " .. index .. "..."
+            SC.TextColor3 = T.Warning
+            local ok, err = pcall(function()
+                TeleportService:TeleportToPlaceInstance(PLACE_ID, server.id, Player)
+            end)
+            if not ok then
+                JB.Text = "Join"
+                SC.Text = "❌ Falha ao entrar"
+                SC.TextColor3 = T.Danger
+            end
+        end)
+    end
+
+    -- 🔧 Ao clicar em Buscar
+    Btn.MouseButton1Click:Connect(function()
+        SC.Text = "🔍 Buscando servidores..."
+        SC.TextColor3 = T.SubText
+        for _, c in ipairs(SS:GetChildren()) do
+            if c:IsA("Frame") then c:Destroy() end
+        end
+
+        task.spawn(function()
+            local servers = FetchAllServers()
+
+            if #servers == 0 then
+                SC.Text = "❌ Nenhum servidor encontrado"
+                SC.TextColor3 = T.Danger
+                return
+            end
+
+            -- 🔧 Ordena por menos players (mais vazio primeiro)
+            table.sort(servers, function(a, b)
+                local pa = a.playing or 999
+                local pb = b.playing or 999
+                if pa ~= pb then return pa < pb end
+                return (a.id or "") < (b.id or "")
+            end)
+
+            for i, s in ipairs(servers) do
+                CreateServerEntry(i, s)
+            end
+
+            SS.CanvasSize = UDim2.new(0, 0, 0, #servers * 72 + 12)
+            SC.Text = string.format("✅ %d servidores encontrados (menos players primeiro)", #servers)
+            SC.TextColor3 = T.Primary
         end)
     end)
 end)
-
 SafeCall("Tab_Setting", function()
     local _, Page = TM:RegisterTab("Setting", 6, "SETTING")
     SectionTitle(Page, "Settings", 1)
