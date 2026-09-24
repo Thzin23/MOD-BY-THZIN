@@ -1,6 +1,6 @@
 --==================================================
--- BY THZIN | STEAL AN EGG | COMPLETO v9
--- Material Design | #151E19 | Resize + Velocidade Real + Drone Fix
+-- BY THZIN | STEAL AN EGG | COMPLETO v14
+-- Material Design | #151E19 | Preview + Ambos Teleport
 --==================================================
 _G.YOKUDO = {
     Name = "BY THZIN", AssetID = "rbxassetid://101352576986760",
@@ -66,11 +66,8 @@ end
 -- SAVE / RESTORE VELOCIDADE REAL
 --==================================================
 local SavedStats = {
-    Humanoid = nil,
-    WalkSpeed = nil,
-    JumpPower = nil,
-    JumpHeight = nil,
-    UseJumpPower = nil,
+    Humanoid = nil, WalkSpeed = nil, JumpPower = nil,
+    JumpHeight = nil, UseJumpPower = nil,
 }
 
 local function SaveStatsIfNeeded()
@@ -84,7 +81,7 @@ local function SaveStatsIfNeeded()
     SavedStats.JumpPower = H.JumpPower
     SavedStats.JumpHeight = H.JumpHeight
     SavedStats.UseJumpPower = H.UseJumpPower
-    print("[BY THZIN] Stats salvos | WalkSpeed: " .. tostring(H.WalkSpeed) .. " | JumpPower: " .. tostring(H.JumpPower))
+    print("[BY THZIN] Stats salvos | WalkSpeed: " .. tostring(H.WalkSpeed))
 end
 
 local function RestoreSavedState()
@@ -93,9 +90,7 @@ local function RestoreSavedState()
     local H = C:FindFirstChildOfClass("Humanoid")
     if not H then return end
     pcall(function()
-        H.PlatformStand = false
-        H.Sit = false
-        H.AutoRotate = true
+        H.PlatformStand = false H.Sit = false H.AutoRotate = true
         if SavedStats.Humanoid == H then
             if SavedStats.WalkSpeed then H.WalkSpeed = SavedStats.WalkSpeed end
             if SavedStats.JumpPower then H.JumpPower = SavedStats.JumpPower end
@@ -141,22 +136,16 @@ local function RestoreSavedState()
         if not PM then return end
         local ok, M = pcall(function() return require(PM) end)
         if not ok or not M then return end
-        local Ctrl
-        pcall(function() Ctrl = M:GetControls() end)
+        local Ctrl pcall(function() Ctrl = M:GetControls() end)
         if not Ctrl then return end
         pcall(function() Ctrl:OnCharacterAdded(C) end)
         pcall(function() Ctrl:UpdateActiveControlModuleEnabled() end)
     end)
 end
 
-local function ResetCharacterState()
-    RestoreSavedState()
-end
+local function ResetCharacterState() RestoreSavedState() end
 
-task.spawn(function()
-    task.wait(3)
-    SaveStatsIfNeeded()
-end)
+task.spawn(function() task.wait(3) SaveStatsIfNeeded() end)
 Player.CharacterAdded:Connect(function()
     SavedStats.Humanoid = nil
     task.wait(3)
@@ -228,7 +217,7 @@ SafeCall("UI", function()
     Main.Size = UDim2.new(0,_G.YOKUDO.UI.Width,0,_G.YOKUDO.UI.Height)
     Main.Position = UDim2.new(0.5,-_G.YOKUDO.UI.Width/2,0.5,-_G.YOKUDO.UI.Height/2)
     Main.BackgroundColor3 = T.Background Main.BorderSizePixel = 0
-    Main.ClipsDescendants = true Main.Active = true Main.Parent = ScreenGui
+    Main.ClipsDescendants = false Main.Active = true Main.Parent = ScreenGui
     Instance.new("UICorner", Main).CornerRadius = UDim.new(0,16)
     local mb = Instance.new("UIStroke", Main)
     mb.Color = T.Divider mb.Thickness = 1 mb.Transparency = 0.4
@@ -257,7 +246,7 @@ SafeCall("UI", function()
 
     local Sub = Instance.new("TextLabel")
     Sub.Size = UDim2.new(1,-160,0,16) Sub.Position = UDim2.new(0,40,0,38)
-    Sub.BackgroundTransparency = 1 Sub.Text = "Steal An Egg • v1.2"
+    Sub.BackgroundTransparency = 1 Sub.Text = "Steal An Egg • v2.1"
     Sub.TextColor3 = T.SubText Sub.TextSize = 11
     Sub.TextXAlignment = Enum.TextXAlignment.Left
     Sub.Font = Enum.Font.GothamMedium Sub.ZIndex = 22 Sub.Parent = TopBar
@@ -443,8 +432,8 @@ local function CreatePage(Name)
     Page.ScrollBarImageTransparency = 0.2 Page.ZIndex = 6
     Page.Parent = _G.YOKUDO_Content
     local p = Instance.new("UIPadding", Page)
-    p.PaddingTop = UDim.new(0,14) p.PaddingBottom = UDim.new(0,16)
-    p.PaddingLeft = UDim.new(0,16) p.PaddingRight = UDim.new(0,14)
+    p.PaddingTop = UDim.new(0,14) p.PaddingBottom = UDim.new(0,14)
+    p.PaddingLeft = UDim.new(0,14) p.PaddingRight = UDim.new(0,14)
     local l = Instance.new("UIListLayout", Page)
     l.Padding = UDim.new(0,8) l.SortOrder = Enum.SortOrder.LayoutOrder
     return Page
@@ -746,7 +735,7 @@ SafeCall("GodMode", function()
 end)
 
 --==================================================
--- TELEPORT SYSTEM
+-- TELEPORT SYSTEM (v14 - Ambos métodos corrigidos)
 --==================================================
 SafeCall("TeleportSystem", function()
     local Container = workspace:WaitForChild("AreaEggSlotsClient", 20)
@@ -799,6 +788,9 @@ SafeCall("TeleportSystem", function()
     local RemotesFired = false
     local SavedTargetPosition = nil
     local TargetLockedCFrame = nil
+
+    local WasWalkSpeedEnabled = false
+    local WasWalkSpeedValue = nil
 
     local function GetHumanoid()
         local Char = Player.Character
@@ -997,11 +989,16 @@ SafeCall("TeleportSystem", function()
         return Closest
     end
 
+    -- ═══════════════════════════════════════════
+    -- FLY TP (método TeleportFly)
+    -- ═══════════════════════════════════════════
     local function FlyTP(Destination, Speed, UseShotTP, IsSafeZone, Callback)
         CleanupMovers()
         local Hum, Root = GetHumanoid()
-        if not Hum or not Root then return end
-        if Hum.Health <= 0 then return end
+        if not Hum or not Root or Hum.Health <= 0 then
+            if Callback then Callback() end
+            return
+        end
 
         local FlyPos = Vector3.new(Destination.X, Destination.Y + FLY_OFFSET, Destination.Z)
         local LockCFrame = CFrame.new(Destination + Vector3.new(0, LOCK_ABOVE, 0))
@@ -1010,17 +1007,12 @@ SafeCall("TeleportSystem", function()
         BodyVelocity = Instance.new("BodyVelocity")
         BodyVelocity.Name = "YokudoBV"
         BodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        BodyVelocity.P = 1250
-        BodyVelocity.Velocity = Vector3.zero
-        BodyVelocity.Parent = Root
+        BodyVelocity.P = 1250 BodyVelocity.Velocity = Vector3.zero BodyVelocity.Parent = Root
 
         BodyGyro = Instance.new("BodyGyro")
         BodyGyro.Name = "YokudoBG"
         BodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-        BodyGyro.P = 3000
-        BodyGyro.D = 500
-        BodyGyro.CFrame = Root.CFrame
-        BodyGyro.Parent = Root
+        BodyGyro.P = 3000 BodyGyro.D = 500 BodyGyro.CFrame = Root.CFrame BodyGyro.Parent = Root
 
         local StartTime = tick()
         local ShotDone = false
@@ -1086,11 +1078,16 @@ SafeCall("TeleportSystem", function()
         end)
     end
 
+    -- ═══════════════════════════════════════════
+    -- INSTANT TP (método InstantTeleport)
+    -- ═══════════════════════════════════════════
     local function InstantFlyTP(Destination, Callback)
         CleanupMovers()
         local Hum, Root = GetHumanoid()
-        if not Hum or not Root then return end
-        if Hum.Health <= 0 then return end
+        if not Hum or not Root or Hum.Health <= 0 then
+            if Callback then Callback() end
+            return
+        end
         local LockCFrame = CFrame.new(Destination + Vector3.new(0, LOCK_ABOVE, 0))
         Root.CFrame = LockCFrame
         Root.AssemblyLinearVelocity = Vector3.zero
@@ -1099,6 +1096,7 @@ SafeCall("TeleportSystem", function()
         if Callback then Callback() end
     end
 
+    -- Função unificada que escolhe método
     local function TeleportToTarget(TargetPos, Callback)
         if CurrentMethod == "InstantTeleport" then
             print("[BY THZIN] Instant TP to Target")
@@ -1181,6 +1179,15 @@ SafeCall("TeleportSystem", function()
         StopActiveHeartbeat()
         RestoreStats()
         RestoreSavedState()
+
+        if WasWalkSpeedEnabled and _G.YOKUDO_WalkSpeed then
+            task.wait(0.3)
+            _G.YOKUDO_WalkSpeed.SetValue(WasWalkSpeedValue or 50)
+            _G.YOKUDO_WalkSpeed.Enable()
+            print("[BY THZIN] WalkSpeed mod reativado")
+            WasWalkSpeedEnabled = false
+        end
+
         print("[BY THZIN] TeleportSystem: Auto Stop")
     end
 
@@ -1204,17 +1211,13 @@ SafeCall("TeleportSystem", function()
             end
         end
         if not TargetPos then AutoStop() return end
-        TeleportToTarget(TargetPos, function()
-            CurrentStep = "collect_target"
-        end)
+        TeleportToTarget(TargetPos, function() CurrentStep = "collect_target" end)
     end
 
     local function FlyToSafeZone()
         CurrentStep = "to_safe"
         print("[BY THZIN] FlyTP to Safe Zone (No Shot TP)")
-        FlyTP(SAFE_ZONE, RETURN_SPEED, false, true, function()
-            AutoStop()
-        end)
+        FlyTP(SAFE_ZONE, RETURN_SPEED, false, true, function() AutoStop() end)
     end
 
     local function StartActiveHeartbeat()
@@ -1289,6 +1292,15 @@ SafeCall("TeleportSystem", function()
     end
 
     local function StartProcess()
+        if _G.YOKUDO_WalkSpeed and _G.YOKUDO_WalkSpeed.IsEnabled() then
+            WasWalkSpeedEnabled = true
+            WasWalkSpeedValue = _G.YOKUDO_WalkSpeed.GetValue()
+            _G.YOKUDO_WalkSpeed.Disable()
+            print("[BY THZIN] WalkSpeed mod pausado durante AutoFarm")
+        else
+            WasWalkSpeedEnabled = false
+        end
+
         Running = true
         CurrentStep = "search"
         CollectAttempts = 0
@@ -1335,31 +1347,31 @@ SafeCall("TeleportSystem", function()
         CurrentStep = "fly_first"
         StartActiveHeartbeat()
 
-        print("[BY THZIN] FlyTP to First Egg (Shot TP)")
-        FlyTP(EggPos, FLY_SPEED, true, false, function()
-            CurrentStep = "collect_first"
-        end)
+        -- 🔧 CORRIGIDO: First Egg respeita o método escolhido
+        if CurrentMethod == "InstantTeleport" then
+            print("[BY THZIN] Instant TP to First Egg")
+            InstantFlyTP(EggPos, function() CurrentStep = "collect_first" end)
+        else
+            print("[BY THZIN] FlyTP to First Egg (Shot TP)")
+            FlyTP(EggPos, FLY_SPEED, true, false, function() CurrentStep = "collect_first" end)
+        end
     end
 
     local function FullReset()
-        Running = false
-        CurrentStep = "idle"
-        CurrentMode = "none"
-        FirstEggList = {}
-        FirstEggUid = nil
-        FirstEggSlotKey = nil
-        CollectAttempts = 0
-        CollectTime = 0
-        FlyTargetStarted = false
-        CollectDone = false
-        TargetCollected = false
-        RemotesFired = false
-        SavedTargetPosition = nil
-        TargetLockedCFrame = nil
-        CleanupMovers()
-        DisableRagdollBypass()
-        StopActiveHeartbeat()
-        RestoreStats()
+        Running = false CurrentStep = "idle" CurrentMode = "none"
+        FirstEggList = {} FirstEggUid = nil FirstEggSlotKey = nil
+        CollectAttempts = 0 CollectTime = 0
+        FlyTargetStarted = false CollectDone = false
+        TargetCollected = false RemotesFired = false
+        SavedTargetPosition = nil TargetLockedCFrame = nil
+        CleanupMovers() DisableRagdollBypass() StopActiveHeartbeat() RestoreStats()
+
+        if WasWalkSpeedEnabled and _G.YOKUDO_WalkSpeed then
+            _G.YOKUDO_WalkSpeed.SetValue(WasWalkSpeedValue or 50)
+            _G.YOKUDO_WalkSpeed.Enable()
+            WasWalkSpeedEnabled = false
+        end
+
         print("[BY THZIN] TeleportSystem: Full Reset")
     end
 
@@ -1368,23 +1380,14 @@ SafeCall("TeleportSystem", function()
             if Running then return end
             if not CollectEvent then warn("[BY THZIN] CollectEvent not found") return end
             if not TARGET_UID then warn("[BY THZIN] No Target ID") return end
-            FullReset()
-            StartProcess()
+            FullReset() StartProcess()
             print("[BY THZIN] TeleportSystem: ON | Method: " .. CurrentMethod)
         end,
-        Disable = function()
-            FullReset()
-            RestoreSavedState()
-            print("[BY THZIN] TeleportSystem: OFF")
-        end,
-        SetTargetId = function(Id)
-            TARGET_UID = Id
-            print("[BY THZIN] Target ID: " .. tostring(Id))
-        end,
+        Disable = function() FullReset() RestoreSavedState() print("[BY THZIN] TeleportSystem: OFF") end,
+        SetTargetId = function(Id) TARGET_UID = Id print("[BY THZIN] Target ID: " .. tostring(Id)) end,
         SetSpeed = function(Value)
             Value = math.clamp(Value, 50, 1100)
-            FLY_SPEED = Value
-            RETURN_SPEED = Value
+            FLY_SPEED = Value RETURN_SPEED = Value
             print("[BY THZIN] Speed: " .. tostring(Value))
         end,
         SetMethod = function(Method)
@@ -1408,6 +1411,7 @@ end)
 --==================================================
 SafeCall("AutoFarm", function()
     local Enabled, Selected, List = false, nil, {}
+
     local function GetDataPaths()
         local Data = ReplicatedStorage:FindFirstChild("Data")
         local Assets = Data and Data:FindFirstChild("Assets")
@@ -1482,20 +1486,21 @@ SafeCall("AutoFarm", function()
                 local cat = MatchCategory(c)
                 if cat then
                     local D = GetData(cat)
+                    local scale = c:GetAttribute("AssetScale") or 1
                     table.insert(List, {
                         Id = c.Name, Category = cat,
                         DisplayName = (D and D.DisplayName) or cat,
                         Icon = D and D.Icon or nil,
                         EarningRate = (D and D.EarningRate) or 0,
-                        Model = c,
+                        Model = c, Scale = scale,
                     })
                 end
             end
         end
         table.sort(List, function(a,b) return a.EarningRate > b.EarningRate end)
-        print("[BY THZIN] Scan → Mostrados: " .. #List)
         return List
     end
+
     _G.YOKUDO_AutoFarm = {
         Enable = function() Enabled = true end,
         Disable = function() Enabled = false end,
@@ -1522,9 +1527,6 @@ SafeCall("AutoFarm", function()
     }
 end)
 
---==================================================
--- AUTO ATTACK
---==================================================
 SafeCall("AutoAttack", function()
     local Backpack = Player:WaitForChild("Backpack", 10)
     local RANGE, INTERVAL = 60, 0.01
@@ -1621,9 +1623,6 @@ SafeCall("AutoAttack", function()
     }
 end)
 
---==================================================
--- AFK SYSTEM
---==================================================
 SafeCall("AFKSystem", function()
     local SPEED = 400
     local SAFE = Vector3.new(533,70,-366)
@@ -1643,10 +1642,7 @@ SafeCall("AFKSystem", function()
                 if c.Name == "YokudoBV" or c.Name == "YokudoBG" then c:Destroy() end
             end
         end
-        if H then pcall(function()
-            H.PlatformStand = false
-            H.Sit = false
-        end) end
+        if H then pcall(function() H.PlatformStand = false H.Sit = false end) end
     end
     local function FindPlot()
         local P = workspace:FindFirstChild("Plots") if not P then return end
@@ -1719,8 +1715,7 @@ SafeCall("AFKSystem", function()
             if not Enabled then return end
             Enabled = false
             if Thread then pcall(function() task.cancel(Thread) end) Thread = nil end
-            Cleanup()
-            RestoreSavedState()
+            Cleanup() RestoreSavedState()
         end,
         IsEnabled = function() return Enabled end,
         FlyTP = FlyTP,
@@ -1729,9 +1724,6 @@ SafeCall("AFKSystem", function()
     }
 end)
 
---==================================================
--- ATTACK DRONE (Original restaurado - com teleporte)
---==================================================
 SafeCall("AttackDrone", function()
     local ATTACK_RANGE = 16
     local ATTACK_INTERVAL = 0.02
@@ -1748,80 +1740,48 @@ SafeCall("AttackDrone", function()
     local CONTAINER_NAME = "ScrambleLocalVisuals"
     local SEARCH_PREFIXES = { "DroneVisual_", "PersonalDrone_" }
     local TIER_PRIORITY = {
-        ["AugmentedDrone"] = 1,
-        ["ReactorDrone"] = 2,
-        ["ScrapDrone"] = 3,
+        ["AugmentedDrone"] = 1, ["ReactorDrone"] = 2, ["ScrapDrone"] = 3,
     }
     local MAX_ALLOWED_PRIORITY = 3
 
     local Enabled = false
-    local AttackConnection = nil
-    local FollowConnection = nil
-    local LockConnection = nil
-    local BodyVelocity = nil
-    local BodyGyro = nil
-    local CurrentTarget = nil
-    local CurrentTargetPriority = nil
-    local LastFire = 0
-    local TraceSequence = 0
-    local IsLocked = false
-    local LockCFrame = nil
-    local CurrentSpawnIndex = 1
-    local IsFlying = false
-    local SpawnLoopRunning = false
+    local AttackConnection, FollowConnection, LockConnection = nil, nil, nil
+    local BodyVelocity, BodyGyro = nil, nil
+    local CurrentTarget, CurrentTargetPriority = nil, nil
+    local LastFire, TraceSequence = 0, 0
+    local IsLocked, LockCFrame = false, nil
+    local CurrentSpawnIndex, IsFlying, SpawnLoopRunning = 1, false, false
 
-    local SavedStatsDrone = {
-        WalkSpeed = nil,
-        JumpPower = nil,
-        JumpHeight = nil,
-        UseJumpPower = nil,
-        Humanoid = nil,
-    }
-
-    local StartFollow
-    local FlyTPToPosition
-    local StartAttackLoop
-    local SpawnLoop
-    local StopAttack
+    local SavedStatsDrone = {WalkSpeed=nil,JumpPower=nil,JumpHeight=nil,UseJumpPower=nil,Humanoid=nil}
+    local StartFollow, FlyTPToPosition, StartAttackLoop, SpawnLoop, StopAttack
 
     local function GetHumanoid()
-        local Char = Player.Character
-        if not Char then return nil, nil end
-        local Hum = Char:FindFirstChildOfClass("Humanoid")
-        local Root = Char:FindFirstChild("HumanoidRootPart")
-        return Hum, Root
+        local Char = Player.Character if not Char then return nil, nil end
+        return Char:FindFirstChildOfClass("Humanoid"), Char:FindFirstChild("HumanoidRootPart")
     end
-
     local function GetBatSwingRemote()
         local Success, Remote = pcall(function()
             return ReplicatedStorage.Packages.Networking["RE/BatSwing/Trigger"]
         end)
         if Success and Remote then return Remote end
-        return nil
     end
-
     local function SaveLiveStats()
-        local Hum = GetHumanoid()
-        if not Hum then return end
+        local Hum = GetHumanoid() if not Hum then return end
         SavedStatsDrone.Humanoid = Hum
         SavedStatsDrone.WalkSpeed = Hum.WalkSpeed
         SavedStatsDrone.JumpPower = Hum.JumpPower
         SavedStatsDrone.JumpHeight = Hum.JumpHeight
         SavedStatsDrone.UseJumpPower = Hum.UseJumpPower
     end
-
     local function RestoreLiveStats()
-        local Hum = GetHumanoid()
-        if not Hum then return end
+        local Hum = GetHumanoid() if not Hum then return end
         if SavedStatsDrone.WalkSpeed ~= nil then pcall(function() Hum.WalkSpeed = SavedStatsDrone.WalkSpeed end) end
         if SavedStatsDrone.JumpPower ~= nil then pcall(function() Hum.JumpPower = SavedStatsDrone.JumpPower end) end
         if SavedStatsDrone.JumpHeight ~= nil then pcall(function() Hum.JumpHeight = SavedStatsDrone.JumpHeight end) end
         if SavedStatsDrone.UseJumpPower ~= nil then pcall(function() Hum.UseJumpPower = SavedStatsDrone.UseJumpPower end) end
     end
-
     local function EnsureStatsAlive()
-        local Hum = GetHumanoid()
-        if not Hum then return end
+        local Hum = GetHumanoid() if not Hum then return end
         if SavedStatsDrone.Humanoid ~= Hum then
             SavedStatsDrone.Humanoid = Hum
             SavedStatsDrone.WalkSpeed = Hum.WalkSpeed
@@ -1830,47 +1790,30 @@ SafeCall("AttackDrone", function()
             SavedStatsDrone.UseJumpPower = Hum.UseJumpPower
         end
     end
-
     local function CleanupMovers()
         if FollowConnection then FollowConnection:Disconnect() FollowConnection = nil end
         if LockConnection then LockConnection:Disconnect() LockConnection = nil end
         if BodyVelocity then
-            pcall(function()
-                BodyVelocity.Velocity = Vector3.zero
-                BodyVelocity.MaxForce = Vector3.zero
-            end)
-            BodyVelocity:Destroy()
-            BodyVelocity = nil
+            pcall(function() BodyVelocity.Velocity = Vector3.zero BodyVelocity.MaxForce = Vector3.zero end)
+            BodyVelocity:Destroy() BodyVelocity = nil
         end
         if BodyGyro then
             pcall(function() BodyGyro.MaxTorque = Vector3.zero end)
-            BodyGyro:Destroy()
-            BodyGyro = nil
+            BodyGyro:Destroy() BodyGyro = nil
         end
         local Hum, Root = GetHumanoid()
         if Root then
             for _, Child in ipairs(Root:GetChildren()) do
-                if Child.Name == "YokudoBV" or Child.Name == "YokudoBG" then
-                    pcall(function() Child:Destroy() end)
-                end
+                if Child.Name == "YokudoBV" or Child.Name == "YokudoBG" then pcall(function() Child:Destroy() end) end
             end
         end
-        if Hum then
-            pcall(function()
-                Hum.PlatformStand = false
-                Hum.Sit = false
-            end)
-        end
-        if Root then
-            pcall(function()
-                Root.AssemblyLinearVelocity = Vector3.zero
-                Root.AssemblyAngularVelocity = Vector3.zero
-            end)
-        end
-        IsLocked = false
-        LockCFrame = nil
+        if Hum then pcall(function() Hum.PlatformStand = false Hum.Sit = false end) end
+        if Root then pcall(function()
+            Root.AssemblyLinearVelocity = Vector3.zero
+            Root.AssemblyAngularVelocity = Vector3.zero
+        end) end
+        IsLocked = false LockCFrame = nil
     end
-
     local function GetPosition(Object)
         if not Object then return nil end
         if Object:IsA("Model") then
@@ -1880,14 +1823,10 @@ SafeCall("AttackDrone", function()
             for _, Desc in ipairs(Object:GetDescendants()) do
                 if Desc:IsA("BasePart") then return Desc.Position end
             end
-        elseif Object:IsA("BasePart") then
-            return Object.Position
-        end
-        return nil
+        elseif Object:IsA("BasePart") then return Object.Position end
     end
-
     local function GetLookVector(Object)
-        if not Object then return Vector3.new(0, 0, -1) end
+        if not Object then return Vector3.new(0,0,-1) end
         local Part = nil
         if Object:IsA("Model") then
             Part = Object.PrimaryPart or Object:FindFirstChildWhichIsA("BasePart")
@@ -1896,13 +1835,10 @@ SafeCall("AttackDrone", function()
                     if Desc:IsA("BasePart") then Part = Desc break end
                 end
             end
-        elseif Object:IsA("BasePart") then
-            Part = Object
-        end
+        elseif Object:IsA("BasePart") then Part = Object end
         if Part then return Part.CFrame.LookVector end
-        return Vector3.new(0, 0, -1)
+        return Vector3.new(0,0,-1)
     end
-
     local function FindAllDrones()
         local Container = workspace:FindFirstChild(CONTAINER_NAME)
         if not Container then return {} end
@@ -1917,20 +1853,17 @@ SafeCall("AttackDrone", function()
         end
         return Drones
     end
-
     local function GetDroneTier(Drone)
         if not Drone then return nil end
         local Tier = nil
         pcall(function() Tier = Drone:GetAttribute("ScrambleTier") end)
         return Tier
     end
-
     local function GetDronePriority(Drone)
         local Tier = GetDroneTier(Drone)
         if not Tier then return nil end
         return TIER_PRIORITY[Tier]
     end
-
     local function FindBestDrone()
         local Drones = FindAllDrones()
         if #Drones == 0 then return nil end
@@ -1945,37 +1878,30 @@ SafeCall("AttackDrone", function()
                 if Pos then
                     local Dist = math.floor((Pos - CurrentSpawn).Magnitude)
                     if Priority < BestPriority or (Priority == BestPriority and Dist < BestDist) then
-                        BestPriority = Priority
-                        BestDist = Dist
-                        Best = Drone
+                        BestPriority = Priority BestDist = Dist Best = Drone
                     end
                 end
             end
         end
         return Best, BestPriority, BestDist
     end
-
     local function GetBehindPosition(Target)
         local TargetPos = GetPosition(Target)
         if not TargetPos then return nil end
         local LookVector = GetLookVector(Target)
         local BehindPos = TargetPos - (LookVector * FOLLOW_BEHIND_DISTANCE)
-        BehindPos = Vector3.new(BehindPos.X, TargetPos.Y + 1, BehindPos.Z)
-        return BehindPos
+        return Vector3.new(BehindPos.X, TargetPos.Y + 1, BehindPos.Z)
     end
-
     local function StartLock(Position, LookAt)
-        LockCFrame = CFrame.new(Position, LookAt or (Position + Vector3.new(0, 0, -1)))
+        LockCFrame = CFrame.new(Position, LookAt or (Position + Vector3.new(0,0,-1)))
         if LockConnection then LockConnection:Disconnect() end
         IsLocked = true
         LockConnection = RunService.Heartbeat:Connect(function()
             if not Enabled then
                 if LockConnection then LockConnection:Disconnect() LockConnection = nil end
-                IsLocked = false
-                return
+                IsLocked = false return
             end
-            local Hum, Root = GetHumanoid()
-            if not Root then return end
+            local _, Root = GetHumanoid() if not Root then return end
             if CurrentTarget and CurrentTarget.Parent then
                 local NewBehind = GetBehindPosition(CurrentTarget)
                 local NewTargetPos = GetPosition(CurrentTarget)
@@ -1988,215 +1914,136 @@ SafeCall("AttackDrone", function()
             Root.AssemblyAngularVelocity = Vector3.zero
         end)
     end
-
     StartFollow = function()
         CleanupMovers()
         local Hum, Root = GetHumanoid()
-        if not Hum or not Root then return end
-        if Hum.Health <= 0 then return end
+        if not Hum or not Root or Hum.Health <= 0 then return end
         Hum.PlatformStand = true
-
         BodyVelocity = Instance.new("BodyVelocity")
         BodyVelocity.Name = "YokudoBV"
         BodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        BodyVelocity.P = 1250
-        BodyVelocity.Velocity = Vector3.zero
-        BodyVelocity.Parent = Root
-
+        BodyVelocity.P = 1250 BodyVelocity.Velocity = Vector3.zero BodyVelocity.Parent = Root
         BodyGyro = Instance.new("BodyGyro")
         BodyGyro.Name = "YokudoBG"
         BodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-        BodyGyro.P = 3000
-        BodyGyro.D = 500
-        BodyGyro.CFrame = Root.CFrame
-        BodyGyro.Parent = Root
-
+        BodyGyro.P = 3000 BodyGyro.D = 500 BodyGyro.CFrame = Root.CFrame BodyGyro.Parent = Root
         FollowConnection = RunService.Heartbeat:Connect(function()
             if not Enabled then CleanupMovers() return end
             local Hum2, Root2 = GetHumanoid()
-            if not Hum2 or not Root2 then CleanupMovers() return end
-            if Hum2.Health <= 0 then return end
+            if not Hum2 or not Root2 or Hum2.Health <= 0 then CleanupMovers() return end
             if not BodyVelocity or not BodyGyro then CleanupMovers() return end
             if not CurrentTarget or not CurrentTarget.Parent then CleanupMovers() return end
-
-            local TargetPos = GetPosition(CurrentTarget)
-            if not TargetPos then CleanupMovers() return end
-            local BehindPos = GetBehindPosition(CurrentTarget)
-            if not BehindPos then CleanupMovers() return end
-
+            local TargetPos = GetPosition(CurrentTarget) if not TargetPos then CleanupMovers() return end
+            local BehindPos = GetBehindPosition(CurrentTarget) if not BehindPos then CleanupMovers() return end
             local CurrentPos = Root2.Position
             local Direction = BehindPos - CurrentPos
             local TotalDist = math.floor(Direction.Magnitude)
-
             if TotalDist <= SHORT_TP_DISTANCE then
                 CleanupMovers()
                 Root2.CFrame = CFrame.new(BehindPos, TargetPos)
                 Root2.AssemblyLinearVelocity = Vector3.zero
                 Root2.AssemblyAngularVelocity = Vector3.zero
-                StartLock(BehindPos, TargetPos)
-                return
+                StartLock(BehindPos, TargetPos) return
             end
-
             BodyVelocity.Velocity = Direction.Unit * FOLLOW_SPEED
             BodyGyro.CFrame = CFrame.new(CurrentPos, TargetPos)
         end)
     end
-
     FlyTPToPosition = function(Destination, Callback)
-        CleanupMovers()
-        IsFlying = true
+        CleanupMovers() IsFlying = true
         local Hum, Root = GetHumanoid()
-        if not Hum or not Root then IsFlying = false if Callback then Callback() end return end
-        if Hum.Health <= 0 then IsFlying = false if Callback then Callback() end return end
-
+        if not Hum or not Root or Hum.Health <= 0 then IsFlying = false if Callback then Callback() end return end
         Hum.PlatformStand = true
-
         BodyVelocity = Instance.new("BodyVelocity")
         BodyVelocity.Name = "YokudoBV"
         BodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        BodyVelocity.P = 1250
-        BodyVelocity.Velocity = Vector3.zero
-        BodyVelocity.Parent = Root
-
+        BodyVelocity.P = 1250 BodyVelocity.Velocity = Vector3.zero BodyVelocity.Parent = Root
         BodyGyro = Instance.new("BodyGyro")
         BodyGyro.Name = "YokudoBG"
         BodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-        BodyGyro.P = 3000
-        BodyGyro.D = 500
-        BodyGyro.CFrame = Root.CFrame
-        BodyGyro.Parent = Root
-
+        BodyGyro.P = 3000 BodyGyro.D = 500 BodyGyro.CFrame = Root.CFrame BodyGyro.Parent = Root
         local StartTime = tick()
         FollowConnection = RunService.Heartbeat:Connect(function()
             if not Enabled then CleanupMovers() IsFlying = false return end
             local Hum2, Root2 = GetHumanoid()
-            if not Hum2 or not Root2 then CleanupMovers() IsFlying = false return end
-            if Hum2.Health <= 0 then return end
+            if not Hum2 or not Root2 or Hum2.Health <= 0 then CleanupMovers() IsFlying = false return end
             if not BodyVelocity or not BodyGyro then CleanupMovers() IsFlying = false return end
-
             local CurrentPos = Root2.Position
             local Direction = Destination - CurrentPos
             local TotalDist = math.floor(Direction.Magnitude)
-
             if TotalDist <= 2 then
-                CleanupMovers()
-                IsFlying = false
+                CleanupMovers() IsFlying = false
                 Root2.CFrame = CFrame.new(Destination)
                 Root2.AssemblyLinearVelocity = Vector3.zero
                 Root2.AssemblyAngularVelocity = Vector3.zero
-                if Callback then Callback() end
-                return
+                if Callback then Callback() end return
             end
-
-            if tick() - StartTime > ARRIVE_TIMEOUT then
-                CleanupMovers()
-                IsFlying = false
-                if Callback then Callback() end
-                return
-            end
-
+            if tick() - StartTime > ARRIVE_TIMEOUT then CleanupMovers() IsFlying = false if Callback then Callback() end return end
             BodyVelocity.Velocity = Direction.Unit * FOLLOW_SPEED
             BodyGyro.CFrame = CFrame.new(CurrentPos, Destination)
         end)
     end
-
     local function FireAtDrone(Drone)
         if not Drone or not Drone.Parent then return end
         local isDrone = false
         for _, prefix in ipairs(SEARCH_PREFIXES) do
-            if string.sub(Drone.Name, 1, #prefix) == prefix then
-                isDrone = true
-                break
-            end
+            if string.sub(Drone.Name, 1, #prefix) == prefix then isDrone = true break end
         end
         if not isDrone then return end
-
-        local Remote = GetBatSwingRemote()
-        if not Remote then return end
-        local Hum, Root = GetHumanoid()
-        if not Root then return end
-        local DronePos = GetPosition(Drone)
-        if not DronePos then return end
+        local Remote = GetBatSwingRemote() if not Remote then return end
+        local _, Root = GetHumanoid() if not Root then return end
+        local DronePos = GetPosition(Drone) if not DronePos then return end
         local Dist = math.floor((DronePos - Root.Position).Magnitude)
         if Dist > ATTACK_RANGE then return end
-
         TraceSequence = TraceSequence + 1
-        local TraceId = tostring(Player.UserId) .. ":" .. tostring(TraceSequence) .. ":" .. tostring(math.floor(workspace:GetServerTimeNow() * 1000))
+        local TraceId = tostring(Player.UserId)..":"..tostring(TraceSequence)..":"..tostring(math.floor(workspace:GetServerTimeNow()*1000))
         pcall(function() Remote:FireServer(Drone, TraceId) end)
     end
-
     StartAttackLoop = function()
         if AttackConnection then AttackConnection:Disconnect() AttackConnection = nil end
         AttackConnection = RunService.Heartbeat:Connect(function()
             if not Enabled then return end
             if IsFlying then return end
-            local Hum, Root = GetHumanoid()
-            if not Hum or not Root then return end
-            if Hum.Health <= 0 then return end
+            local Hum, Root = GetHumanoid() if not Hum or not Root or Hum.Health <= 0 then return end
             EnsureStatsAlive()
-
             if not CurrentTarget or not CurrentTarget.Parent then
                 local NewTarget, NewPriority = FindBestDrone()
-                if NewTarget then
-                    CurrentTarget = NewTarget
-                    CurrentTargetPriority = NewPriority
-                    StartFollow()
-                end
+                if NewTarget then CurrentTarget = NewTarget CurrentTargetPriority = NewPriority StartFollow() end
                 return
             end
-
             local CurrentPriority = GetDronePriority(CurrentTarget)
             local BestDrone, BestPriority = FindBestDrone()
             if BestDrone and BestPriority and CurrentPriority and BestPriority < CurrentPriority then
-                CurrentTarget = BestDrone
-                CurrentTargetPriority = BestPriority
-                StartFollow()
-                return
+                CurrentTarget = BestDrone CurrentTargetPriority = BestPriority StartFollow() return
             end
-
             local now = tick()
             if now - LastFire >= ATTACK_INTERVAL then
-                LastFire = now
-                FireAtDrone(CurrentTarget)
+                LastFire = now FireAtDrone(CurrentTarget)
             end
         end)
     end
-
     SpawnLoop = function()
         if SpawnLoopRunning then return end
         SpawnLoopRunning = true
         task.spawn(function()
             while Enabled do
                 local CurrentSpawn = (CurrentSpawnIndex == 1) and SPAWN_POSITION_1 or SPAWN_POSITION_2
-                if CurrentTarget and CurrentTarget.Parent then
-                    task.wait(0.5)
-                    continue
-                end
-
-                print("[BY THZIN] Drone: Voando pro Spawn " .. CurrentSpawnIndex)
+                if CurrentTarget and CurrentTarget.Parent then task.wait(0.5) continue end
                 local Arrived = false
                 FlyTPToPosition(CurrentSpawn, function() Arrived = true end)
                 local WaitTime = 0
                 while Enabled and not Arrived and WaitTime < ARRIVE_TIMEOUT do
-                    task.wait(0.1)
-                    WaitTime = WaitTime + 0.1
+                    task.wait(0.1) WaitTime = WaitTime + 0.1
                 end
                 if not Enabled then break end
                 task.wait(SPAWN_WAIT_TIME)
                 if not Enabled then break end
-
                 local Found = FindBestDrone()
                 if Found and Found.Parent then
-                    print("[BY THZIN] Drone: Encontrado Top " .. tostring(GetDronePriority(Found)))
-                    CurrentTarget = Found
-                    StartFollow()
-                    while Enabled and CurrentTarget and CurrentTarget.Parent do
-                        task.wait(0.5)
-                    end
-                    print("[BY THZIN] Drone: Morto → Volta pro Spawn 1")
+                    CurrentTarget = Found StartFollow()
+                    while Enabled and CurrentTarget and CurrentTarget.Parent do task.wait(0.5) end
                     CurrentSpawnIndex = 1
                 else
-                    print("[BY THZIN] Drone: Nada no Spawn " .. CurrentSpawnIndex .. " → Alternando")
                     CurrentSpawnIndex = (CurrentSpawnIndex == 1) and 2 or 1
                 end
                 task.wait(0.2)
@@ -2204,76 +2051,39 @@ SafeCall("AttackDrone", function()
             SpawnLoopRunning = false
         end)
     end
-
-    StopAttack = function()
-        CleanupMovers()
-        CurrentTarget = nil
-        CurrentTargetPriority = nil
-        SpawnLoopRunning = false
-    end
-
+    StopAttack = function() CleanupMovers() CurrentTarget = nil CurrentTargetPriority = nil SpawnLoopRunning = false end
     local function StartAttack()
         if Enabled then return end
-        Enabled = true
-        SaveLiveStats()
-        if _G.YOKUDO_AutoAttack then
-            pcall(function() _G.YOKUDO_AutoAttack.EnableAutoEquip() end)
-        end
+        Enabled = true SaveLiveStats()
+        if _G.YOKUDO_AutoAttack then pcall(function() _G.YOKUDO_AutoAttack.EnableAutoEquip() end) end
         StartAttackLoop()
-        FlyTPToPosition(SAFE_ZONE, function()
-            task.wait(SAFE_WAIT_TIME)
-            SpawnLoop()
-        end)
+        FlyTPToPosition(SAFE_ZONE, function() task.wait(SAFE_WAIT_TIME) SpawnLoop() end)
         print("[BY THZIN] Attack Drone: ON")
     end
-
     local function StopAttackDrone()
         if not Enabled then return end
         Enabled = false
         if AttackConnection then AttackConnection:Disconnect() AttackConnection = nil end
-        CleanupMovers()
-        CurrentTarget = nil
-        CurrentTargetPriority = nil
-        CurrentSpawnIndex = 1
-        IsFlying = false
-        SpawnLoopRunning = false
+        CleanupMovers() CurrentTarget = nil CurrentTargetPriority = nil
+        CurrentSpawnIndex = 1 IsFlying = false SpawnLoopRunning = false
         RestoreLiveStats()
-        if _G.YOKUDO_AutoAttack then
-            pcall(function() _G.YOKUDO_AutoAttack.DisableAutoEquip() end)
-        end
+        if _G.YOKUDO_AutoAttack then pcall(function() _G.YOKUDO_AutoAttack.DisableAutoEquip() end) end
         RestoreSavedState()
         print("[BY THZIN] Attack Drone: OFF")
     end
-
-    Player.CharacterAdded:Connect(function()
-        if Enabled then
-            task.wait(1)
-            SaveLiveStats()
-        end
-    end)
-
+    Player.CharacterAdded:Connect(function() if Enabled then task.wait(1) SaveLiveStats() end end)
     _G.YOKUDO_AttackDrone = {
-        Start = StartAttack,
-        Stop = StopAttackDrone,
-        Enable = StartAttack,
-        Disable = StopAttackDrone,
-        Toggle = function()
-            if Enabled then StopAttackDrone() else StartAttack() end
-        end,
+        Start = StartAttack, Stop = StopAttackDrone,
+        Enable = StartAttack, Disable = StopAttackDrone,
+        Toggle = function() if Enabled then StopAttackDrone() else StartAttack() end end,
         IsEnabled = function() return Enabled end,
-        StopAttack = StopAttack,
-        SpawnLoop = SpawnLoop,
-        FindAllDrones = FindAllDrones,
-        FindBestDrone = FindBestDrone,
-        GetDronePriority = GetDronePriority,
-        GetBatSwingRemote = GetBatSwingRemote,
+        StopAttack = StopAttack, SpawnLoop = SpawnLoop,
+        FindAllDrones = FindAllDrones, FindBestDrone = FindBestDrone,
+        GetDronePriority = GetDronePriority, GetBatSwingRemote = GetBatSwingRemote,
         GetSavedStats = function() return SavedStatsDrone end,
-        SPAWN_POSITION_1 = SPAWN_POSITION_1,
-        SPAWN_POSITION_2 = SPAWN_POSITION_2,
-        SAFE_ZONE = SAFE_ZONE,
-        POINT_1 = POINT_1,
-        TIER_PRIORITY = TIER_PRIORITY,
-        MAX_ALLOWED_PRIORITY = MAX_ALLOWED_PRIORITY,
+        SPAWN_POSITION_1 = SPAWN_POSITION_1, SPAWN_POSITION_2 = SPAWN_POSITION_2,
+        SAFE_ZONE = SAFE_ZONE, POINT_1 = POINT_1,
+        TIER_PRIORITY = TIER_PRIORITY, MAX_ALLOWED_PRIORITY = MAX_ALLOWED_PRIORITY,
         FOLLOW_SPEED = FOLLOW_SPEED,
     }
 end)
@@ -2304,8 +2114,7 @@ SafeCall("ManualFastClick", function()
             local C = 0
             HC = RunService.Heartbeat:Connect(function()
                 if not Enabled then return end
-                C = C + 1
-                if C >= 30 then C = 0 Scan() end
+                C = C + 1 if C >= 30 then C = 0 Scan() end
             end)
         end,
         Disable = function()
@@ -2322,9 +2131,7 @@ SafeCall("ConfigSystem", function()
     local FOLDER = "YOKUDO-SAE"
     local FILE = FOLDER .. "/yokudo.json"
     local DEF = {SelectedMethod = "TeleportFly", TeleportSpeed = 300}
-    local function Ensure()
-        pcall(function() if not isfolder(FOLDER) then makefolder(FOLDER) end end)
-    end
+    local function Ensure() pcall(function() if not isfolder(FOLDER) then makefolder(FOLDER) end end) end
     local function Load()
         Ensure()
         local C = table.clone(DEF)
@@ -2336,9 +2143,7 @@ SafeCall("ConfigSystem", function()
         if type(D.SelectedMethod) == "string" and (D.SelectedMethod == "TeleportFly" or D.SelectedMethod == "InstantTeleport") then
             C.SelectedMethod = D.SelectedMethod
         end
-        if type(D.TeleportSpeed) == "number" then
-            C.TeleportSpeed = math.clamp(D.TeleportSpeed, 50, 1100)
-        end
+        if type(D.TeleportSpeed) == "number" then C.TeleportSpeed = math.clamp(D.TeleportSpeed, 50, 1100) end
         return C
     end
     local function Save(C)
@@ -2378,7 +2183,7 @@ SafeCall("Tab_Info", function()
     L1.Font = Enum.Font.GothamBold L1.ZIndex = 9 L1.Parent = Card
     local L2 = Instance.new("TextLabel")
     L2.Size = UDim2.new(1,-32,0,20) L2.Position = UDim2.new(0,16,0,42)
-    L2.BackgroundTransparency = 1 L2.Text = "Steal An Egg • v1.2"
+    L2.BackgroundTransparency = 1 L2.Text = "Steal An Egg • v2.1"
     L2.TextColor3 = T.SubText L2.TextSize = 12
     L2.TextXAlignment = Enum.TextXAlignment.Left
     L2.Font = Enum.Font.Gotham L2.ZIndex = 9 L2.Parent = Card
@@ -2401,84 +2206,96 @@ SafeCall("Tab_Combat", function()
         function() if _G.YOKUDO_AutoAttack then _G.YOKUDO_AutoAttack.DisableAutoHit() end end)
 end)
 
+--==================================================
+-- TAB AUTO FARMING (Preview em cima + Lista embaixo)
+--==================================================
 SafeCall("Tab_AutoFarming", function()
     local _, Page = TM:RegisterTab("Auto Farming", 3, "AUTO_FARMING")
     SectionTitle(Page, "Auto Farming", 1)
 
-    local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Size = UDim2.new(1,0,0,18)
-    StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Text = "Clique em ↻ REFRESH pra escanear"
-    StatusLabel.TextColor3 = T.SubText
-    StatusLabel.TextSize = 11
-    StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-    StatusLabel.Font = Enum.Font.GothamMedium
-    StatusLabel.LayoutOrder = 2
-    StatusLabel.Parent = Page
+    -- Card 1: Preview + START/STOP (EM CIMA)
+    local PreviewRow = Instance.new("Frame")
+    PreviewRow.Size = UDim2.new(1,0,0,80)
+    PreviewRow.BackgroundColor3 = T.Surface
+    PreviewRow.BorderSizePixel = 0
+    PreviewRow.LayoutOrder = 2
+    PreviewRow.Parent = Page
+    Instance.new("UICorner", PreviewRow).CornerRadius = UDim.new(0,10)
+    local prS = Instance.new("UIStroke", PreviewRow)
+    prS.Color = T.Divider prS.Thickness = 1 prS.Transparency = 0.6
 
-    local InfoLabel = Instance.new("TextLabel")
-    InfoLabel.Size = UDim2.new(1,0,0,26)
-    InfoLabel.BackgroundColor3 = T.SurfaceHi
-    InfoLabel.BorderSizePixel = 0
-    InfoLabel.Text = "  🎯 Nenhum ovo selecionado"
-    InfoLabel.TextColor3 = T.SubText
-    InfoLabel.TextSize = 12
-    InfoLabel.TextXAlignment = Enum.TextXAlignment.Left
-    InfoLabel.Font = Enum.Font.GothamBold
-    InfoLabel.LayoutOrder = 3
-    InfoLabel.Parent = Page
-    Instance.new("UICorner", InfoLabel).CornerRadius = UDim.new(0,8)
+    local PrevIcon = Instance.new("ImageLabel")
+    PrevIcon.Size = UDim2.new(0,64,0,64)
+    PrevIcon.Position = UDim2.new(0,8,0.5,-32)
+    PrevIcon.BackgroundColor3 = T.Background
+    PrevIcon.BorderSizePixel = 0
+    PrevIcon.Image = ""
+    PrevIcon.Parent = PreviewRow
+    Instance.new("UICorner", PrevIcon).CornerRadius = UDim.new(0,10)
 
-    local BtnRow = Instance.new("Frame")
-    BtnRow.Size = UDim2.new(1,0,0,42)
-    BtnRow.BackgroundColor3 = T.Surface
-    BtnRow.BorderSizePixel = 0
-    BtnRow.LayoutOrder = 4
-    BtnRow.Parent = Page
-    Instance.new("UICorner", BtnRow).CornerRadius = UDim.new(0,10)
-    local bs = Instance.new("UIStroke", BtnRow)
-    bs.Color = T.Divider bs.Thickness = 1 bs.Transparency = 0.6
+    local PrevPlaceholder = Instance.new("TextLabel")
+    PrevPlaceholder.Size = UDim2.new(1,0,1,0)
+    PrevPlaceholder.BackgroundTransparency = 1
+    PrevPlaceholder.Text = "🥚"
+    PrevPlaceholder.TextColor3 = T.SubText
+    PrevPlaceholder.TextSize = 28
+    PrevPlaceholder.Font = Enum.Font.GothamBold
+    PrevPlaceholder.Parent = PrevIcon
 
-    local RowLayout = Instance.new("UIListLayout", BtnRow)
-    RowLayout.FillDirection = Enum.FillDirection.Horizontal
-    RowLayout.Padding = UDim.new(0,6)
-    RowLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    RowLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    local PrevName = Instance.new("TextLabel")
+    PrevName.Size = UDim2.new(1,-250,0,20)
+    PrevName.Position = UDim2.new(0,80,0,16)
+    PrevName.BackgroundTransparency = 1
+    PrevName.Text = "Nenhum animal"
+    PrevName.TextColor3 = T.SubText
+    PrevName.TextSize = 13
+    PrevName.TextXAlignment = Enum.TextXAlignment.Left
+    PrevName.Font = Enum.Font.GothamBold
+    PrevName.TextTruncate = Enum.TextTruncate.AtEnd
+    PrevName.Parent = PreviewRow
 
-    local function MakeBtn(text, bg, fg)
-        local B = Instance.new("TextButton")
-        B.Size = UDim2.new(0,0,0,30)
-        B.BackgroundColor3 = bg
-        B.BorderSizePixel = 0
-        B.Text = text
-        B.TextColor3 = fg or T.Background
-        B.TextSize = 11
-        B.Font = Enum.Font.GothamBold
-        B.AutoButtonColor = false
-        B.Parent = BtnRow
-        Instance.new("UICorner", B).CornerRadius = UDim.new(0,6)
-        AddRipple(B, fg or T.Background)
-        return B
-    end
+    local PrevRate = Instance.new("TextLabel")
+    PrevRate.Size = UDim2.new(1,-250,0,18)
+    PrevRate.Position = UDim2.new(0,80,0,42)
+    PrevRate.BackgroundTransparency = 1
+    PrevRate.Text = "Selecione um ovo"
+    PrevRate.TextColor3 = T.SubText
+    PrevRate.TextSize = 11
+    PrevRate.TextXAlignment = Enum.TextXAlignment.Left
+    PrevRate.Font = Enum.Font.GothamMedium
+    PrevRate.Parent = PreviewRow
 
-    local RefreshBtn = MakeBtn("↻ REFRESH", T.SurfaceHi2, T.Text)
-    local StartBtn   = MakeBtn("▶ START",   T.Primary,    T.Background)
-    local StopBtn    = MakeBtn("■ STOP",    T.Danger,     Color3.fromRGB(255,255,255))
+    local StartBtn = Instance.new("TextButton")
+    StartBtn.Size = UDim2.new(0,72,0,30)
+    StartBtn.Position = UDim2.new(1,-152,0.5,-16)
+    StartBtn.BackgroundColor3 = T.Primary
+    StartBtn.BorderSizePixel = 0
+    StartBtn.Text = "▶ START"
+    StartBtn.TextColor3 = T.Background
+    StartBtn.TextSize = 11
+    StartBtn.Font = Enum.Font.GothamBold
+    StartBtn.AutoButtonColor = false
+    StartBtn.Parent = PreviewRow
+    Instance.new("UICorner", StartBtn).CornerRadius = UDim.new(0,8)
+    AddRipple(StartBtn, T.Background)
 
-    local function LayoutBtns()
-        local total = BtnRow.AbsoluteSize.X
-        local each = math.floor((total - 24) / 3)
-        if each > 10 then
-            RefreshBtn.Size = UDim2.new(0, each, 0, 30)
-            StartBtn.Size   = UDim2.new(0, each, 0, 30)
-            StopBtn.Size    = UDim2.new(0, each, 0, 30)
-        end
-    end
-    task.spawn(function() task.wait(0.15) LayoutBtns() end)
-    BtnRow:GetPropertyChangedSignal("AbsoluteSize"):Connect(LayoutBtns)
+    local StopBtn = Instance.new("TextButton")
+    StopBtn.Size = UDim2.new(0,72,0,30)
+    StopBtn.Position = UDim2.new(1,-76,0.5,-16)
+    StopBtn.BackgroundColor3 = T.Danger
+    StopBtn.BorderSizePixel = 0
+    StopBtn.Text = "■ STOP"
+    StopBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    StopBtn.TextSize = 11
+    StopBtn.Font = Enum.Font.GothamBold
+    StopBtn.AutoButtonColor = false
+    StopBtn.Parent = PreviewRow
+    Instance.new("UICorner", StopBtn).CornerRadius = UDim.new(0,8)
+    AddRipple(StopBtn, Color3.fromRGB(255,255,255))
 
+    -- Card 2: Lista (EMBAIXO)
     local Scroll = Instance.new("ScrollingFrame")
-    Scroll.Size = UDim2.new(1,0,0,250)
+    Scroll.Size = UDim2.new(1,0,0,270)
     Scroll.BackgroundColor3 = T.Surface
     Scroll.BorderSizePixel = 0
     Scroll.CanvasSize = UDim2.new(0,0,0,0)
@@ -2487,7 +2304,7 @@ SafeCall("Tab_AutoFarming", function()
     Scroll.ScrollBarThickness = 6
     Scroll.ScrollBarImageColor3 = T.Primary
     Scroll.ScrollBarImageTransparency = 0.3
-    Scroll.LayoutOrder = 5
+    Scroll.LayoutOrder = 3
     Scroll.Parent = Page
     Instance.new("UICorner", Scroll).CornerRadius = UDim.new(0,10)
     local ss = Instance.new("UIStroke", Scroll)
@@ -2503,40 +2320,44 @@ SafeCall("Tab_AutoFarming", function()
     LL.Padding = UDim.new(0,6)
     LL.SortOrder = Enum.SortOrder.LayoutOrder
 
-    local scanCount = 0
-
-    local function Refresh()
-        if not _G.YOKUDO_AutoFarm then
-            StatusLabel.Text = "❌ AutoFarm não carregou"
-            StatusLabel.TextColor3 = T.Danger
+    local function UpdatePreview(E)
+        if not E then
+            PrevIcon.Image = ""
+            PrevPlaceholder.Visible = true
+            PrevName.Text = "Nenhum animal"
+            PrevName.TextColor3 = T.SubText
+            PrevRate.Text = "Selecione um ovo"
+            PrevRate.TextColor3 = T.SubText
+            prS.Color = T.Divider
+            prS.Transparency = 0.6
             return
         end
+        PrevIcon.Image = E.Icon or ""
+        PrevPlaceholder.Visible = false
+        PrevName.Text = (E.DisplayName or "?") .. (E.Scale and E.Scale > 1 and (" ×"..E.Scale) or "")
+        PrevName.TextColor3 = T.Text
+        PrevRate.Text = "$" .. (_G.YOKUDO_AutoFarm and _G.YOKUDO_AutoFarm.FormatMoney(E.EarningRate or 0) or "0") .. "/s"
+        PrevRate.TextColor3 = T.Primary
+        prS.Color = T.Primary
+        prS.Transparency = 0.3
+
+        PrevIcon.ImageTransparency = 1
+        PrevName.TextTransparency = 1
+        PrevRate.TextTransparency = 1
+        TweenService:Create(PrevIcon, TweenInfo.new(0.2), {ImageTransparency = 0}):Play()
+        TweenService:Create(PrevName, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
+        TweenService:Create(PrevRate, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
+    end
+
+    local function Refresh()
+        if not _G.YOKUDO_AutoFarm then return end
         for _, c in ipairs(Scroll:GetChildren()) do
             if c:IsA("Frame") then c:Destroy() end
         end
-        local ok, Eggs = pcall(function() return _G.YOKUDO_AutoFarm.ScanEggs() end)
-        if not ok then
-            StatusLabel.Text = "❌ Erro no scan: " .. tostring(Eggs)
-            StatusLabel.TextColor3 = T.Danger
-            return
-        end
-        if type(Eggs) ~= "table" then
-            StatusLabel.Text = "❌ Scan não retornou lista"
-            StatusLabel.TextColor3 = T.Danger
-            return
-        end
-        scanCount = scanCount + 1
-        if #Eggs == 0 then
-            StatusLabel.Text = "❌ 0 ovos (vá até a área dos ovos)"
-            StatusLabel.TextColor3 = T.Danger
-            return
-        end
-        StatusLabel.Text = "✅ " .. #Eggs .. " ovo(s) • Scan #" .. scanCount
-        StatusLabel.TextColor3 = T.Primary
-
+        local Eggs = _G.YOKUDO_AutoFarm.ScanEggs()
         for idx, E in ipairs(Eggs) do
             local Entry = Instance.new("Frame")
-            Entry.Size = UDim2.new(1,-4,0,60)
+            Entry.Size = UDim2.new(1,-4,0,56)
             Entry.BackgroundColor3 = T.SurfaceHi
             Entry.BorderSizePixel = 0
             Entry.LayoutOrder = idx
@@ -2544,8 +2365,8 @@ SafeCall("Tab_AutoFarming", function()
             Instance.new("UICorner", Entry).CornerRadius = UDim.new(0,8)
 
             local II = Instance.new("ImageLabel")
-            II.Size = UDim2.new(0,44,0,44)
-            II.Position = UDim2.new(0,8,0.5,-22)
+            II.Size = UDim2.new(0,42,0,42)
+            II.Position = UDim2.new(0,7,0.5,-21)
             II.BackgroundColor3 = T.Background
             II.BorderSizePixel = 0
             II.Image = E.Icon or ""
@@ -2553,35 +2374,35 @@ SafeCall("Tab_AutoFarming", function()
             Instance.new("UICorner", II).CornerRadius = UDim.new(0,8)
 
             local NL = Instance.new("TextLabel")
-            NL.Size = UDim2.new(1,-180,0,20)
-            NL.Position = UDim2.new(0,60,0,8)
+            NL.Size = UDim2.new(1,-160,0,18)
+            NL.Position = UDim2.new(0,58,0,8)
             NL.BackgroundTransparency = 1
-            NL.Text = E.DisplayName or "?"
+            NL.Text = (E.DisplayName or "?") .. (E.Scale and E.Scale > 1 and (" ×"..E.Scale) or "")
             NL.TextColor3 = T.Text
-            NL.TextSize = 13
+            NL.TextSize = 12
             NL.TextXAlignment = Enum.TextXAlignment.Left
             NL.Font = Enum.Font.GothamBold
             NL.Parent = Entry
 
             local RL = Instance.new("TextLabel")
-            RL.Size = UDim2.new(1,-180,0,18)
-            RL.Position = UDim2.new(0,60,0,30)
+            RL.Size = UDim2.new(1,-160,0,16)
+            RL.Position = UDim2.new(0,58,0,28)
             RL.BackgroundTransparency = 1
             RL.Text = "$" .. _G.YOKUDO_AutoFarm.FormatMoney(E.EarningRate or 0) .. "/s"
             RL.TextColor3 = T.Primary
-            RL.TextSize = 11
+            RL.TextSize = 10
             RL.TextXAlignment = Enum.TextXAlignment.Left
             RL.Font = Enum.Font.GothamMedium
             RL.Parent = Entry
 
             local SB = Instance.new("TextButton")
-            SB.Size = UDim2.new(0,80,0,34)
-            SB.Position = UDim2.new(1,-88,0.5,-17)
+            SB.Size = UDim2.new(0,74,0,30)
+            SB.Position = UDim2.new(1,-82,0.5,-15)
             SB.BackgroundColor3 = T.Primary
             SB.BorderSizePixel = 0
             SB.Text = "Select"
             SB.TextColor3 = T.Background
-            SB.TextSize = 12
+            SB.TextSize = 11
             SB.Font = Enum.Font.GothamBold
             SB.AutoButtonColor = false
             SB.Parent = Entry
@@ -2590,41 +2411,32 @@ SafeCall("Tab_AutoFarming", function()
 
             SB.MouseButton1Click:Connect(function()
                 _G.YOKUDO_AutoFarm.SelectEgg(E)
-                InfoLabel.Text = "  🎯 " .. (E.DisplayName or "?") .. " — $" .. _G.YOKUDO_AutoFarm.FormatMoney(E.EarningRate or 0) .. "/s"
-                InfoLabel.TextColor3 = T.Primary
-                StatusLabel.Text = "🎯 Selecionado: " .. (E.DisplayName or "?")
-                StatusLabel.TextColor3 = T.Warning
+                UpdatePreview(E)
             end)
         end
-
         Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
         task.wait()
-        Scroll.CanvasSize = UDim2.new(0, 0, 0, #Eggs * 66 + 16)
+        Scroll.CanvasSize = UDim2.new(0, 0, 0, #Eggs * 62 + 16)
     end
 
-    RefreshBtn.MouseButton1Click:Connect(function()
-        StatusLabel.Text = "🔍 Scaneando..."
-        StatusLabel.TextColor3 = T.SubText
-        Refresh()
-    end)
     StartBtn.MouseButton1Click:Connect(function()
-        if _G.YOKUDO_AutoFarm then
-            local sel = _G.YOKUDO_AutoFarm.GetSelectedEgg()
-            if not sel then
-                StatusLabel.Text = "⚠ Selecione um ovo primeiro"
-                StatusLabel.TextColor3 = T.Warning
-                return
-            end
-            _G.YOKUDO_AutoFarm.StartTeleport()
-            StatusLabel.Text = "▶ Teleporte ATIVADO"
-            StatusLabel.TextColor3 = T.Primary
+        if not _G.YOKUDO_AutoFarm then return end
+        local sel = _G.YOKUDO_AutoFarm.GetSelectedEgg()
+        if not sel then
+            PrevRate.Text = "⚠ Escolha um animal"
+            PrevRate.TextColor3 = T.Warning
+            return
         end
+        _G.YOKUDO_AutoFarm.StartTeleport()
+        PrevRate.Text = "▶ Teleportando..."
+        PrevRate.TextColor3 = T.Primary
     end)
+
     StopBtn.MouseButton1Click:Connect(function()
         if _G.YOKUDO_AutoFarm then
             _G.YOKUDO_AutoFarm.StopTeleport()
-            StatusLabel.Text = "■ Teleporte PARADO"
-            StatusLabel.TextColor3 = T.Danger
+            PrevRate.Text = "■ Parado"
+            PrevRate.TextColor3 = T.Danger
         end
     end)
 
@@ -2802,7 +2614,7 @@ SafeCall("Tab_Setting", function()
 end)
 
 --==================================================
--- BYPASS (só no respawn)
+-- BYPASS
 --==================================================
 SafeCall("Bypass", function()
     local function Run()
@@ -2852,4 +2664,4 @@ end)
 --==================================================
 task.wait(0.15)
 TM:SelectTabByName("Info")
-Log("🚀 BY THZIN v9 + Drone Fix Ready! Tabs: " .. #TM.Tabs)
+Log("🚀 BY THZIN v14 Ready! Tabs: " .. #TM.Tabs)
