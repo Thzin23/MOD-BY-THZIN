@@ -1,6 +1,6 @@
 --==================================================
--- MANOX HUB PREMIUM v8.2 | Redesign YOKUDO Style
--- Toggle fix: sem reentrada no callback
+-- MANOX HUB PREMIUM v9.0 | Fly integrado
+-- Squid Game REMOVIDO
 --==================================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -25,9 +25,6 @@ local Opcoes = {
     puloInfinito = false,
     noclip = false,
     hitbox = false,
-    rlgl = false,
-    removerCorda = false,
-    glassMaker = false,
     attachPlayer = false,
     aimbotEnabled = false,
     aimSmoothness = 0.4,
@@ -47,6 +44,114 @@ local fovCircle = nil
 local ScreenGuiGlobal = nil
 local ConexoesExecucao = {}
 local EspToggleRefs = {}
+
+--==================================================
+-- FLY STATE
+--==================================================
+local FlyState = {
+    Enabled = false,
+    Speed = 1,
+    UpPressed = false,
+    DownPressed = false,
+    FlyConn = nil,
+}
+
+local function GetMovementInput()
+    local dir = Vector3.new(0, 0, 0)
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + Vector3.new(0, 0, -1) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir + Vector3.new(0, 0, 1) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir + Vector3.new(-1, 0, 0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + Vector3.new(1, 0, 0) end
+    if dir.Magnitude > 0 then return dir.Unit end
+    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum and hum.MoveDirection.Magnitude > 0 then return hum.MoveDirection.Unit end
+    return Vector3.new(0, 0, 0)
+end
+
+local function StopFly()
+    FlyState.Enabled = false
+    FlyState.UpPressed = false
+    FlyState.DownPressed = false
+
+    if FlyState.FlyConn then
+        pcall(function() FlyState.FlyConn:Disconnect() end)
+        FlyState.FlyConn = nil
+    end
+
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then pcall(function() hum.PlatformStand = false end) end
+        local animate = char:FindFirstChild("Animate")
+        if animate then pcall(function() animate.Disabled = false end) end
+        for _, obj in ipairs(char:GetDescendants()) do
+            if (obj:IsA("BodyGyro") or obj:IsA("BodyVelocity")) and (obj.Name == "ManoxFlyGyro" or obj.Name == "ManoxFlyVel") then
+                pcall(function() obj:Destroy() end)
+            end
+        end
+    end
+end
+
+local function StartFly()
+    if FlyState.Enabled then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    local isR6 = hum.RigType == Enum.HumanoidRigType.R6
+    local bodyPart = isR6 and char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+    if not bodyPart then return end
+
+    FlyState.Enabled = true
+    hum.PlatformStand = true
+
+    local animate = char:FindFirstChild("Animate")
+    if animate then animate.Disabled = true end
+
+    for _, obj in ipairs(char:GetDescendants()) do
+        if (obj:IsA("BodyGyro") or obj:IsA("BodyVelocity")) and (obj.Name == "ManoxFlyGyro" or obj.Name == "ManoxFlyVel") then
+            pcall(function() obj:Destroy() end)
+        end
+    end
+
+    local bg = Instance.new("BodyGyro")
+    bg.Name = "ManoxFlyGyro"
+    bg.P = 9e4
+    bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    bg.CFrame = bodyPart.CFrame
+    bg.Parent = bodyPart
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "ManoxFlyVel"
+    bv.Velocity = Vector3.new(0, 0.1, 0)
+    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    bv.Parent = bodyPart
+
+    FlyState.FlyConn = RunService.RenderStepped:Connect(function()
+        if not FlyState.Enabled then return end
+        if not bg or not bg.Parent or not bv or not bv.Parent then return end
+
+        local cam = workspace.CurrentCamera
+        local moveInput = GetMovementInput()
+        local baseSpeed = 50 * FlyState.Speed
+        local vel = Vector3.new(0, 0.1, 0)
+
+        if moveInput.Magnitude > 0 then
+            local worldDir = cam.CFrame:VectorToWorldSpace(moveInput)
+            vel = worldDir * baseSpeed
+        end
+
+        if FlyState.UpPressed then
+            vel = Vector3.new(vel.X, 40 * FlyState.Speed, vel.Z)
+        elseif FlyState.DownPressed then
+            vel = Vector3.new(vel.X, -40 * FlyState.Speed, vel.Z)
+        end
+
+        bv.Velocity = vel
+        bg.CFrame = cam.CFrame
+    end)
+end
 
 --==================================================
 -- TEMA YOKUDO
@@ -592,7 +697,6 @@ local function CleanupAllESP()
     Highlights = {}
 end
 
--- ✅ SETTER: não toca no toggle (evita loop infinito)
 function setPlayerESP(state)
     state = not not state
     Opcoes.playerEsp = state
@@ -787,30 +891,11 @@ local connHeartbeat = RunService.Heartbeat:Connect(function(deltaTime)
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
             local root = LocalPlayer.Character.HumanoidRootPart
             local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if Opcoes.velocidade and hum and hum.MoveDirection.Magnitude > 0 then
+            if Opcoes.velocidade and hum and hum.MoveDirection.Magnitude > 0 and not FlyState.Enabled then
                 local direcao = hum.MoveDirection
                 root.CFrame = root.CFrame + (direcao * (velocidadeAtual - hum.WalkSpeed) * deltaTime)
             end
             if Opcoes.noclip and hum then hum:ChangeState(Enum.HumanoidStateType.NoPhysics) end
-            if Opcoes.rlgl and workspace:FindFirstChild("RedLight") then
-                if root.AssemblyLinearVelocity.Magnitude > 0.1 then
-                    root.AssemblyLinearVelocity = Vector3.new(0,0,0)
-                end
-            end
-            if Opcoes.removerCorda then
-                local corda = workspace:FindFirstChild("Rope") or workspace:FindFirstChild("TugOfWarRope")
-                if corda then corda:Destroy() end
-            end
-            if Opcoes.glassMaker then
-                for _, v in pairs(workspace:GetDescendants()) do
-                    if v:IsA("BasePart") and (string.find(string.lower(v.Name), "glass") or string.find(string.lower(v.Name), "vidro")) then
-                        if v:GetAttribute("Real") == true or string.find(string.lower(v.Name), "true") then
-                            v.Color = Color3.fromRGB(0, 255, 100)
-                            v.Transparency = 0.5
-                        end
-                    end
-                end
-            end
             if Opcoes.attachPlayer and SelectedPlayer and SelectedPlayer.Character then
                 local trp = SelectedPlayer.Character:FindFirstChild("HumanoidRootPart")
                 if trp then
@@ -830,6 +915,11 @@ local connJump = UserInputService.JumpRequest:Connect(function()
     end)
 end)
 table.insert(ConexoesExecucao, connJump)
+
+-- Para fly em respawn/morte
+LocalPlayer.CharacterRemoving:Connect(function()
+    if FlyState.Enabled then StopFly() end
+end)
 
 --==================================================
 -- UI COMPONENTS
@@ -887,7 +977,6 @@ local function MakeCard(parent, order, height)
     return card
 end
 
--- ✅ TOGGLE CORRIGIDO — sem reentrada
 function UI.Toggle(parent, order, title, subtitle, default, callback, onColor, offColor)
     onColor = onColor or T.Primary
     offColor = offColor or T.SurfaceHi2
@@ -941,7 +1030,7 @@ function UI.Toggle(parent, order, title, subtitle, default, callback, onColor, o
     Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
 
     local enabled = default and true or false
-    local _inCallback = false  -- ✅ guarda contra reentrada
+    local _inCallback = false
 
     local function applyVisual(state)
         switch.BackgroundColor3 = state and onColor or offColor
@@ -949,10 +1038,8 @@ function UI.Toggle(parent, order, title, subtitle, default, callback, onColor, o
         knob.BackgroundColor3 = state and T.Background or T.SubText
     end
 
-    -- aplica visual inicial
     applyVisual(enabled)
 
-    -- ✅ API pública pra controle externo (não dispara callback por padrão)
     local function SetState(state, fireCallback)
         state = not not state
         enabled = state
@@ -967,7 +1054,6 @@ function UI.Toggle(parent, order, title, subtitle, default, callback, onColor, o
         end
     end
 
-    -- ✅ Clique do usuário
     switch.MouseButton1Click:Connect(function()
         if _inCallback then return end
         SetState(not enabled, true)
@@ -1374,6 +1460,7 @@ local function DesativarTudoEFechar()
     for k, _ in pairs(Opcoes) do Opcoes[k] = false end
     ESP.Enabled = false
     pcall(CleanupAllESP)
+    pcall(StopFly)
     if fovCircle then pcall(function() fovCircle:Remove() end) fovCircle = nil end
     for _, conexao in pairs(ConexoesExecucao) do
         if conexao then pcall(function() conexao:Disconnect() end) end
@@ -1452,7 +1539,7 @@ local function CreateHubUI()
     sub.Size = UDim2.new(1, -160, 0, 16)
     sub.Position = UDim2.new(0, 40, 0, 38)
     sub.BackgroundTransparency = 1
-    sub.Text = "Premium • v8.2"
+    sub.Text = "Premium • v9.0 (Fly + Sem Squid)"
     sub.TextColor3 = T.SubText
     sub.TextSize = 11
     sub.TextXAlignment = Enum.TextXAlignment.Left
@@ -1518,17 +1605,18 @@ local function CreateHubUI()
     Content.ZIndex = 5
     Content.Parent = MainFrame
 
+    -- ABAS (Squid removida, Fly adicionada)
     CreateTabButton(TabScroll, "Main", "👤 Player", 1)
     CreateTabButton(TabScroll, "Aim", "🎯 Aimbot", 2)
     CreateTabButton(TabScroll, "Hitbox", "🟥 Hitbox", 3)
-    CreateTabButton(TabScroll, "Squid", "🦑 Squid Game", 4)
+    CreateTabButton(TabScroll, "Fly", "🕊️ Fly", 4)
     CreateTabButton(TabScroll, "ESP", "👁️ ESP", 5)
     CreateTabButton(TabScroll, "Players", "👥 Teleport", 6)
 
     local PageMain = CreatePageScroll(Content, "Main")
     local PageAim = CreatePageScroll(Content, "Aim")
     local PageHitbox = CreatePageScroll(Content, "Hitbox")
-    local PageSquid = CreatePageScroll(Content, "Squid")
+    local PageFly = CreatePageScroll(Content, "Fly")
     local PageESP = CreatePageScroll(Content, "ESP")
     local PagePlayers = CreatePageScroll(Content, "Players")
 
@@ -1557,17 +1645,105 @@ local function CreateHubUI()
         if Opcoes.hitbox then atualizarHitboxes() end
     end)
 
-    -- ============ SQUID PAGE ============
-    UI.SectionTitle(PageSquid, "Squid Game", 1)
-    UI.Toggle(PageSquid, 2, "Anticheat Red Light", "AutoStop quando luz vermelha", Opcoes.rlgl, function(v) Opcoes.rlgl = v end)
-    UI.Toggle(PageSquid, 3, "Remover Corda", "Cabo de guerra sumir", Opcoes.removerCorda, function(v) Opcoes.removerCorda = v end)
-    UI.Toggle(PageSquid, 4, "Glass Maker", "Vidros seguros destacados", Opcoes.glassMaker, function(v) Opcoes.glassMaker = v end)
+    -- ============ FLY PAGE ============
+    local flyOrder = 1
+    UI.SectionTitle(PageFly, "Fly", flyOrder); flyOrder = flyOrder + 1
+
+    local _, flyToggleHandle = UI.Toggle(PageFly, flyOrder, "Ativar Fly", "Voa usando WASD + Câmera", false, function(v)
+        if v then
+            StartFly()
+        else
+            StopFly()
+        end
+    end, T.Primary, T.Danger); flyOrder = flyOrder + 1
+
+    UI.Slider(PageFly, flyOrder, "Multiplicador de Velocidade", 1, 20, 1, function(v)
+        FlyState.Speed = v
+    end); flyOrder = flyOrder + 1
+
+    UI.SectionTitle(PageFly, "Controles Verticais", flyOrder); flyOrder = flyOrder + 1
+
+    -- Container para botões Subir/Descer
+    local vertContainer = Instance.new("Frame")
+    vertContainer.Size = UDim2.new(1, 0, 0, 56)
+    vertContainer.BackgroundColor3 = T.Surface
+    vertContainer.BorderSizePixel = 0
+    vertContainer.LayoutOrder = flyOrder
+    vertContainer.Parent = PageFly
+    Instance.new("UICorner", vertContainer).CornerRadius = UDim.new(0, 12)
+    local vStroke = Instance.new("UIStroke", vertContainer)
+    vStroke.Color = T.Divider vStroke.Thickness = 1 vStroke.Transparency = 0.6
+
+    local upBtn = Instance.new("TextButton")
+    upBtn.Size = UDim2.new(0.5, -8, 1, -12)
+    upBtn.Position = UDim2.new(0, 6, 0, 6)
+    upBtn.BackgroundColor3 = T.Primary
+    upBtn.BorderSizePixel = 0
+    upBtn.Text = "⬆  Subir"
+    upBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    upBtn.TextSize = 14
+    upBtn.Font = Enum.Font.GothamBold
+    upBtn.AutoButtonColor = false
+    upBtn.Parent = vertContainer
+    Instance.new("UICorner", upBtn).CornerRadius = UDim.new(0, 8)
+
+    local downBtn = Instance.new("TextButton")
+    downBtn.Size = UDim2.new(0.5, -8, 1, -12)
+    downBtn.Position = UDim2.new(0.5, 2, 0, 6)
+    downBtn.BackgroundColor3 = T.Danger
+    downBtn.BorderSizePixel = 0
+    downBtn.Text = "⬇  Descer"
+    downBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    downBtn.TextSize = 14
+    downBtn.Font = Enum.Font.GothamBold
+    downBtn.AutoButtonColor = false
+    downBtn.Parent = vertContainer
+    Instance.new("UICorner", downBtn).CornerRadius = UDim.new(0, 8)
+
+    upBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            FlyState.UpPressed = true
+        end
+    end)
+    upBtn.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            FlyState.UpPressed = false
+        end
+    end)
+
+    downBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            FlyState.DownPressed = true
+        end
+    end)
+    downBtn.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            FlyState.DownPressed = false
+        end
+    end)
+
+    flyOrder = flyOrder + 1
+
+    UI.SectionTitle(PageFly, "Instruções", flyOrder); flyOrder = flyOrder + 1
+
+    local infoCard = MakeCard(PageFly, flyOrder, 110)
+    local infoLbl = Instance.new("TextLabel")
+    infoLbl.Size = UDim2.new(1, -32, 1, -20)
+    infoLbl.Position = UDim2.new(0, 16, 0, 10)
+    infoLbl.BackgroundTransparency = 1
+    infoLbl.Text = "• Ative o Fly primeiro\n• Use W A S D para mover\n• Segure ⬆/⬇ para subir/descer\n• Ajuste a velocidade no slider\n• A câmera define a direção"
+    infoLbl.TextColor3 = T.SubText
+    infoLbl.TextSize = 11
+    infoLbl.TextXAlignment = Enum.TextXAlignment.Left
+    infoLbl.TextYAlignment = Enum.TextYAlignment.Top
+    infoLbl.Font = Enum.Font.Gotham
+    infoLbl.TextWrapped = true
+    infoLbl.Parent = infoCard
 
     -- ============ ESP PAGE ============
     local order = 1
     UI.SectionTitle(PageESP, "ESP Principal", order); order = order + 1
 
-    -- ✅ MASTER TOGGLE: callback só chama setPlayerESP, NÃO mexe no toggle
     local _, masterHandle = UI.Toggle(PageESP, order, "ESP Master", "Liga/desliga todo o ESP", false, function(v)
         local ok, err = pcall(setPlayerESP, v)
         if not ok then warn("[MANOX] Erro no ESP:", err) end
@@ -1711,7 +1887,7 @@ CreateFloatBall()
 CreateFOV()
 
 if not HAS_DRAWING then
-    warn("[MANOX HUB] ⚠️ Seu executor NÃO suporta a biblioteca Drawing. O ESP não vai funcionar. Tente Synapse, Krnl, Fluxus ou Wave.")
+    warn("[MANOX HUB] ⚠️ Seu executor NÃO suporta a biblioteca Drawing. O ESP não vai funcionar.")
 else
-    print("⚡ [MANOX HUB v8.2] Toggle fix aplicado • Sem reentrada • 100% funcional!")
+    print("⚡ [MANOX HUB v9.0] Fly integrado • Squid removido • Tudo funcional!")
 end
